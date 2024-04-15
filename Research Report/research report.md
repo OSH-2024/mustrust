@@ -1,27 +1,38 @@
 # 调研报告：用Rust改写FreeRTOS并支持MMU
 
-* [研究背景](一、研究背景)
-  * [嵌入式系统的重要性：](嵌入式系统的重要性：)
-  * [实时操作系统（RTOS）的作用：](实时操作系统（RTOS）的作用：)
-  * [FreeRTOS的普及与限制：](FreeRTOS的普及与限制：)
-  * [内存管理单元（MMU）的必要性：](内存管理单元（MMU）的必要性：)
-  * [系统级编程语言的选择：](系统级编程语言的选择：)
-  * [Rust在嵌入式系统中的应用前景：](Rust在嵌入式系统中的应用前景：)
-  * [研究的动机与目标：](研究的动机与目标：)
-  * [现有工作的回顾：](现有工作的回顾：)
-
-* [相关调研](二、相关调研)
-  * [Rust调研](Rust调研)
-    * [Rust是什么](Rust是什么)
-    * [为什么要选择Rust](为什么要选择Rust)
-  * [如何使用Rust进行改写](如何使用Rust进行改写)
-  * [将会面临的挑战](将会面临的挑战)
-* [可行性分析](三、可行性分析)
-* [创新点](四、创新点)
-* [项目价值](五、项目价值)
-* [项目计划](六、项目计划)
-* [团队分工](七、团队分工)
-* [研究结论](八、研究结论)
+* [调研报告：用Rust改写FreeRTOS并支持MMU](#------rust--freertos---mmu)
+  * [一、研究背景](#------)
+    + [嵌入式系统的重要性：](#----------)
+    + [实时操作系统（RTOS）的作用：](#-------rtos-----)
+    + [FreeRTOS的普及与限制：](#freertos-------)
+    + [内存管理单元（MMU）的必要性：](#-------mmu------)
+    + [系统级编程语言的选择：](#-----------)
+    + [Rust在嵌入式系统中的应用前景：](#rust-------------)
+    + [研究的动机与目标：](#---------)
+    + [现有工作的回顾：](#--------)
+  * [二、相关调研](#------)
+    + [Rust调研](#rust--)
+      - [Rust是什么](#rust---)
+      - [为什么要选择Rust](#------rust)
+        * [Rust相比于其他语言的优点](#rust----------)
+        * [用Rust编写嵌入式操作系统的优势](#-rust------------)
+      - [如何使用Rust进行改写](#----rust----)
+      - [将会面临的挑战](#-------)
+    + [MMU调研](#mmu--)
+      - [重要机制&技术](#-------)
+        * [Paging](#paging)
+        * [TLB](#tlb)
+      - [可行性分析](#-----)
+        * [硬件可行性](#-----)
+        * [软件可行性](#-----)
+  * [三、可行性分析](#-------)
+  * [四、创新点](#-----)
+  * [五、项目价值](#------)
+  * [六、项目计划](#------)
+  * [七、团队分工](#------)
+  * [八、研究结论](#------)
+  * [参考文献](#----)
+  
 
 ## 一、研究背景
 
@@ -160,7 +171,7 @@ Rust 适用于追求编程语言的速度与稳定性的开发者。所谓速度
 
 总体来说，Rust语言具有很强的控制性和很高的安全性，且运行效率高，无 GC无 VM。
 
-### 如何使用Rust进行改写
+#### 如何使用Rust进行改写
 
 用Rust改写FreeRTOS主要可分为以下几部分工作：
 
@@ -183,7 +194,7 @@ Rust 适用于追求编程语言的速度与稳定性的开发者。所谓速度
    - 结合Rust语言的特性对代码进行优化和改进，如使用`async`/`await`实现异步任务、利用泛型提高代码复用性等。
    - 注意处理内存占用、性能瓶颈等问题，确保Rust版本的FreeRTOS在实际应用中表现良好。
 
-### 将会面临的挑战
+#### 将会面临的挑战
 
 用Rust改写FreeRTOS并不是一项简单的工作，预计改写过程将会面临以下挑战：
 
@@ -196,6 +207,71 @@ Rust 适用于追求编程语言的速度与稳定性的开发者。所谓速度
 7. **社区支持**：Rust相比其他主流语言如C/C++的社区规模可能较小，需要依靠有限的社区资源获取支持和解决问题。
 
 好在已经有前人做过这个项目可以为我们提供参考，此外Rust拥有非常全面和易于理解的[官方文档]([Rust 程序设计语言 - Rust 程序设计语言 中文版 (rustwiki.org)](https://rustwiki.org/zh-CN/book/title-page.html))和教程，包括"The Rust Programming Language"（通常称为Rust Book）、Rust by Example等可以帮助我们较快入门和掌握基本概念。
+
+### MMU调研
+
+MMU的基本目标：
+
+- MMU将虚拟地址(VA)转换为物理地址(PA)，给上层的程序提供抽象。
+- 为进程动态分配内存，同时为内存设立边界
+- 在上述基础下通过缓存等机制尽可能提高访存速度
+
+#### 重要机制&技术
+
+![mmu](F:\CSClasses\OSH\mustrust\Research Report\mmu.png)
+
+##### Paging
+
+Paging是一种内存管理技术，它允许我们假设内存是连续的，即使实际上它是在物理内存的不连续区域上分配的。这通过将虚拟内存空间和物理内存空间划分为固定大小的块（页）来实现。每一个页都有一个独立的地址。MMU用于映射虚拟页到物理页。
+
+##### TLB
+
+转译后援缓冲（Translation Lookaside Buffer，TLB）是一种硬件实现，用于加速虚拟地址到物理地址的转换过程。每当进行地址转换时，MMU首先会查看TLB是否有相应的条目。如果有，就直接使用TLB中的信息进行转换，这被称为TLB命中。如果没有，那么就需要通过页表进行查找，并将结果缓存在TLB中，这被称为TLB缺失。
+
+#### 可行性分析
+
+##### 硬件可行性
+
+树莓派的CPU架构（ARM Cortex-A72）具有支持MMU的硬件，这意味着我们可以在FreeRTOS中实现MMU支持。
+
+##### 软件可行性
+
+
+这个mmu.c是什么？？ https://github.com/jameswalmsley/FreeRTOS/blob/master/FreeRTOS/Demo/CORTEX_A5_SAMA5D3x_Xplained_IAR/AtmelFiles/libchip_sama5d3x/source/mmu.c
+
+调查一下arm的手册
+
+
+根据之前组的[调查结果](https://github.com/OSH-2023/imagination/blob/main/docs/%E7%BB%93%E9%A2%98%E6%8A%A5%E5%91%8A/%E7%BB%93%E9%A2%98%E6%8A%A5%E5%91%8A.md)，我很不乐观
+
+参考：
+
+MMU Lecture slides(部分内容可以从这个借鉴)
+
+-  https://cseweb.ucsd.edu/classes/su09/cse120/lectures/Lecture7.pdf
+-  https://cseweb.ucsd.edu/classes/su09/cse120/lectures/Lecture8.pdf
+
+Paging in MMU:
+
+-  "Memory management unit" from Wikipedia. [Link](https://en.wikipedia.org/wiki/Memory_management_unit)
+-  "CS 537 Lecture Notes Part 7 Paging" from University of Wisconsin-Madison. [Link](https://pages.cs.wisc.edu/~solomon/cs537-old/last/paging.html)
+
+TLB in MMU:
+
+- "Translation lookaside buffer" from Wikipedia. [Link](https://en.wikipedia.org/wiki/Translation_lookaside_buffer)
+- "ARM Cortex-A Series Programmer's Guide for ARMv8-A" from ARM Developer. [Link](https://developer.arm.com/documentation/den0024/latest/The-Memory-Management-Unit/The-Translation-Lookaside-Buffer)
+  <!-- - "ARMv8-A Memory Management: MMU and TLB Explained" from LinkedIn. [Link](https://www.linkedin.com/advice/3/how-do-you-leverage-memory-management-unit-mmu) -->
+
+MMU support in Raspberry Pi CPU architecture:
+
+- "MMU on Raspberry Pi" from snaums.de. [Link](https://www.snaums.de/informatik/mmu-on-raspberry-pi.html)
+- "A Raspberry Pi Operating System for Exploring Advanced..." from University of Maine. [Link](https://web.eece.maine.edu/~vweaver/projects/vmwos/2018_memsys_os.pdf)
+
+MMU support in FreeRTOS:
+
+- "FreeRTOS MMU support - Kernel" from FreeRTOS Forums. [Link](https://forums.freertos.org/t/freertos-mmu-support/10509)
+- "Benefits of Using the Memory Protection Unit" from FreeRTOS. [Link](https://www.freertos.org/2021/02/benefits-of-using-the-memory-protection-unit.html)
+- "mmu.c" from GitHub repos by James Walmsley. [Link](https://github.com/jameswalmsley/FreeRTOS/blob/master/FreeRTOS/Demo/CORTEX_A5_SAMA5D3x_Xplained_IAR/AtmelFiles/libchip_sama5d3x/source/mmu.c)
 
 ## 三、可行性分析
 
