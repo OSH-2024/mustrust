@@ -13,3 +13,11 @@ cc = "1.0"
 [build]
 target = "aarch64-unknown-none"
 
+[profile.dev]
+panic = "abort"
+
+[profile.release]
+panic = "abort"
+
+[target.aarch64-unknown-none]
+linker = "aarch64-none-elf-gcc"

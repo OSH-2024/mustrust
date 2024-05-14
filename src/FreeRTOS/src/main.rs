@@ -4,7 +4,8 @@ use core::panic::PanicInfo;
 // include!("uart.rs");
 
 #[no_mangle]
-fn main() {
+pub extern "C" fn main() -> ! {
+    loop {}
 }
 
 #[panic_handler]
