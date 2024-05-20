@@ -21,3 +21,6 @@ panic = "abort"
 
 [target.aarch64-unknown-none]
 linker = "aarch64-none-elf-gcc"
+
+[unstable]
+features = ["restricted_std"]
