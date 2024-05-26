@@ -1,6 +1,7 @@
 rm build/*
 
-bindgen src/wrapper.c -o src/bindings.rs -- -I src/include -I src/portable/GCC/ARM_CA53_64_RaspberryPi3
+bindgen --ctypes-prefix=cty --use-core src/wrapper.c -o src/bindings.rs -- -I src/include -I src/portable/GCC/ARM_CA53_64_RaspberryPi3
+# sed -i '1i #![no_std]' src/bindings.rs
 aarch64-none-elf-as -mcpu=cortex-a53 -c -o build/FreeRTOS_asm_vector.o src/FreeRTOS_asm_vector.S
 aarch64-none-elf-as -mcpu=cortex-a53 -c -o build/startup.o src/startup.S
 aarch64-none-elf-as -mcpu=cortex-a53 -c -o build/portASM.o src/portable/GCC/ARM_CA53_64_RaspberryPi3/portASM.S
