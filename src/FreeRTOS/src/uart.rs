@@ -1,5 +1,7 @@
-include!("bindings.rs");
+mod bindings;
+
 use core::ptr::*;
+use crate::bindings::*;
 
 /* Defines */
 pub const GPFSEL1: *mut u32 = 0x3F200004 as *mut u32;

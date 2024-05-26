@@ -1,10 +1,14 @@
 #![no_std]
 #![no_main]
+
+mod bindings;
+mod uart;
+
+use core;
 use core::panic::PanicInfo;
 use cty;
-use core;
-// include!("uart.rs");
-include!("bindings.rs");
+use crate::bindings::*;
+use crate::uart::*;
 
 #[no_mangle]
 pub extern "C" fn main() -> ! {
@@ -20,3 +24,6 @@ pub extern "C" fn _exit() -> ! {
 fn panic(_info: &PanicInfo) -> ! {
     loop {}
 }
+
+fn vApplicationIdleHook() {}
+fn vApplicationTickHook() {}
