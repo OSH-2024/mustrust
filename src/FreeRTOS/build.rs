@@ -11,7 +11,7 @@ fn main() {
         .flag("-fpic")
         .flag("-ffreestanding")
         .flag("-O2")
-        .flag("-std=gnu99")
+        .flag("-std=gnu11")
         .target("aarch64-none-elf")
         .compile("libwrapper.a");
 }

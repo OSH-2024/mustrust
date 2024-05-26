@@ -7,6 +7,8 @@ edition = "2021"
 
 [dependencies]
 cty = "*"
+panic-abort = "0.3.2"
+panic-halt = "0.2.0"
 
 [build-dependencies]
 cc = "1.0"
@@ -23,5 +25,3 @@ panic = "abort"
 [target.aarch64-unknown-none]
 linker = "aarch64-none-elf-gcc"
 
-[unstable]
-features = ["restricted_std"]
