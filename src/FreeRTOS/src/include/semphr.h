@@ -40,6 +40,7 @@ typedef QueueHandle_t SemaphoreHandle_t;
 #define semSEMAPHORE_QUEUE_ITEM_LENGTH		( ( uint8_t ) 0U )
 #define semGIVE_BLOCK_TIME					( ( TickType_t ) 0U )
 
+BaseType_t xSemaphoreGive( SemaphoreHandle_t );
 
 /**
  * semphr. h

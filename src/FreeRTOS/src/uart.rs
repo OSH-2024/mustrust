@@ -1,7 +1,6 @@
-mod bindings;
+include!("bindings.rs");
 
 use core::ptr::*;
-use crate::bindings::*;
 
 /* Defines */
 pub const GPFSEL1: *mut u32 = 0x3F200004 as *mut u32;
@@ -24,9 +23,9 @@ static mut uartctl: *mut UARTCTL;
 
 fn uart_putchar(c: u8) {
     unsafe {
-        xSemaphoreTake(&uartctl.tx_mux, portMAX_DELAY);
-        while !(read_volatile(AUX_MU_LSR) & 0x20) {}
+        xSemaphoreTake((*uartctl).tx_mux, portMAX_DELAY);
+        while (read_volatile(AUX_MU_LSR) & 0x20) == 0 {}
         write_volatile(AUX_MU_IO, c as u32);
-        xSemaphoreGive(&uartctl.tx_mux);
+        xSemaphoreGive((*uartctl).tx_mux);
     }
 }
