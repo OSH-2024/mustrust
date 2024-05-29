@@ -35,9 +35,9 @@ static mut count: cty::c_uint32_t = 0;
 pub extern "C" fn interval_func(pxTimer: TimerHandle_t) {
     let mut buf: [cty::c_char, 2] = [0; 2];
     let mut len: cty::c_int = 0;
-    len = uart_read_bytes(buf, buf.len() - 1);
+    len = uart_read_bytes(&mut buf, buf.len() - 1);
     if len > 0 {
-        uart_puts(buf);
+        uart_puts(&buf);
     }
 }
 
@@ -47,11 +47,13 @@ pub extern "C" fn main() -> ! {
     uart_init();
     uart_puts("qemu exit: Ctrl-A x / qemu monitor: Ctrl-A c\n");
 	uart_puts("hello world\n");
-    xTaskCreate(TaskA, "Task A", 512, NULL, tskIDLE_PRIORITY, &mut task_a);
-    timer = xTimerCreate("print_every_10ms", 10 / portTICK_RATE_MS, pdTRUE, NULL as *cty::c_void, interval_func);
-	if (timer != NULL) {
-		xTimerStart(timer, 0);
-	}
+    unsafe {
+        xTaskCreate(TaskA, "Task A", 512, NULL, tskIDLE_PRIORITY, &mut task_a);
+        timer = xTimerCreate("print_every_10ms", 10 / portTICK_RATE_MS, pdTRUE, NULL as *cty::c_void, interval_func);
+        if (timer != NULL) {
+            xTimerStart(timer, 0);
+        }
+    }
 	vTaskStartScheduler();
     loop {}
 }
