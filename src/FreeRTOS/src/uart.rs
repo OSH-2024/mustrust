@@ -74,6 +74,7 @@ struct InterruptVector {
 }
 
 static mut g_vector_table: [InterruptVector; 64] = [InterruptVector { r#fn: None }; 64];
+pub const IRQ_ENABLE_1: *mut u32 = 0x3F00B210 as *mut u32;
 
 pub fn uart_isr_register(r#fn: unsafe extern "C" fn()) {
     unsafe {

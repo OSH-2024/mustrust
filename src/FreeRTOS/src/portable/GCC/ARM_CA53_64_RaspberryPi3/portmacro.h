@@ -56,7 +56,7 @@ typedef portBASE_TYPE BaseType_t;
 typedef uint64_t UBaseType_t;
 
 typedef uint64_t TickType_t;
-#define portMAX_DELAY ( ( TickType_t ) 0xffffffffffffffff )
+const TickType_t portMAX_DELAY = ( TickType_t ) 0xffffffffffffffff;
 
 /*-----------------------------------------------------------*/
 

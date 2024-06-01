@@ -26,7 +26,7 @@ fn TaskA(pvParameters: *const cty::c_void) {
     }
 }
 
-static mut timer: TimerHandle_t = 0;
+static mut timer: TimerHandle_t = 0 as *mut cty::c_void;
 static mut count: cty::uint32_t = 0;
 
 #[no_mangle]
@@ -46,9 +46,9 @@ pub extern "C" fn main() -> ! {
     uart_puts("qemu exit: Ctrl-A x / qemu monitor: Ctrl-A c\n");
 	uart_puts("hello world\n");
     unsafe {
-        xTaskCreate(TaskA, "Task A", 512, NULL, tskIDLE_PRIORITY, &mut task_a);
+        xTaskCreate(TaskA, "Task A", 512, 0, tskIDLE_PRIORITY, &mut task_a);
         timer = xTimerCreate("print_every_10ms", 10 / portTICK_RATE_MS, pdTRUE, 0 as *mut cty::c_void, interval_func);
-        if (timer != 0) {
+        if timer != 0 {
             xTimerStart(timer, 0);
         }
     }
