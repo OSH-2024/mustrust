@@ -16,8 +16,8 @@ pub const AUX_MU_LSR: *mut u32 = 0x3F215054 as *mut u32;
 pub const AUX_MU_BAUD: *mut u32 = 0x3F215068 as *mut u32;
 
 struct UARTCTL {
-    tx_mux: *mut SemaphoreHandle_t,
-    rx_queue: *mut QueueHandle_t
+    tx_mux: SemaphoreHandle_t,
+    rx_queue: QueueHandle_t
 }
 
 static mut uartctl: *mut UARTCTL = 0 as *mut UARTCTL;
@@ -54,12 +54,12 @@ pub fn uart_puthex(v: u64) {
 }
 
 pub fn uart_read_bytes(buf: &mut [u8], length: u32) -> u32 {
-    let num = unsafe { uxQueueMessagesWaiting((*uartctl).rx_queue) };
-    let mut i = 0;
+    let num: u32 = unsafe { uxQueueMessagesWaiting((*uartctl).rx_queue) } as u32;
+    let mut i: u32 = 0;
 
     while i < num && i < length {
         unsafe {
-            xQueueReceive((*uartctl).rx_queue, &mut buf[i as usize], portMAX_DELAY);
+            xQueueReceive((*uartctl).rx_queue, *(&mut buf[i as usize]) as *mut cty::c_void, portMAX_DELAY);
         }
         i += 1;
     }
@@ -117,7 +117,7 @@ pub fn uart_init() {
         write_volatile(AUX_MU_BAUD, 270);
         write_volatile(AUX_MU_LCR, 3);
 
-        uartctl = pvPortMalloc(core::mem::size_of::<UARTCTL>() as u32) as *mut UARTCTL;
+        uartctl = pvPortMalloc(core::mem::size_of::<UARTCTL>() as usize) as *mut UARTCTL;
         (*uartctl).tx_mux = xSemaphoreCreateMutex();
         (*uartctl).rx_queue = xQueueCreate(16, core::mem::size_of::<u8>() as u32);
         uart_isr_register(uart_isr);
