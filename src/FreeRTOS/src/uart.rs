@@ -1,5 +1,6 @@
 include!("bindings.rs");
 
+use core::arch::asm;
 use core::ptr::*;
 
 /* Defines */
@@ -19,9 +20,9 @@ struct UARTCTL {
     rx_queue: *mut QueueHandle_t
 }
 
-static mut uartctl: *mut UARTCTL;
+static mut uartctl: *mut UARTCTL = 0 as *mut UARTCTL;
 
-fn uart_putchar(c: u8) {
+pub fn uart_putchar(c: u8) {
     unsafe {
         xSemaphoreTake((*uartctl).tx_mux, portMAX_DELAY);
         while (read_volatile(AUX_MU_LSR) & 0x20) == 0 {}
@@ -30,7 +31,7 @@ fn uart_putchar(c: u8) {
     }
 }
 
-fn uart_putchar_isr(c: u8) {
+pub fn uart_putchar_isr(c: u8) {
     unsafe {
         xSemaphoreTakeFromISR((*uartctl).tx_mux, core::ptr::null_mut());
         while (read_volatile(AUX_MU_LSR) & 0x20) == 0 {}
@@ -39,20 +40,20 @@ fn uart_putchar_isr(c: u8) {
     }
 }
 
-fn uart_puts(str: &str) {
+pub fn uart_puts(str: &str) {
     for c in str.bytes() {
         uart_putchar(c);
     }
 }
 
-fn uart_puthex(v: u64) {
+pub fn uart_puthex(v: u64) {
     let hexdigits = "0123456789ABCDEF".as_bytes();
     for i in (0..=60).rev().step_by(4) {
         uart_putchar(hexdigits[((v >> i) & 0xf) as usize]);
     }
 }
 
-fn uart_read_bytes(buf: &mut [u8], length: u32) -> u32 {
+pub fn uart_read_bytes(buf: &mut [u8], length: u32) -> u32 {
     let num = unsafe { uxQueueMessagesWaiting((*uartctl).rx_queue) };
     let mut i = 0;
 
@@ -69,14 +70,14 @@ fn uart_read_bytes(buf: &mut [u8], length: u32) -> u32 {
 type InterruptHandler = Option<unsafe extern "C" fn()>;
 
 struct InterruptVector {
-    fn: InterruptHandler,
+    r#fn: InterruptHandler,
 }
 
-static mut g_vector_table: [InterruptVector; 64] = [InterruptVector { fn: None }; 64];
+static mut g_vector_table: [InterruptVector; 64] = [InterruptVector { r#fn: None }; 64];
 
-fn uart_isr_register(fn: unsafe extern "C" fn()) {
+pub fn uart_isr_register(r#fn: unsafe extern "C" fn()) {
     unsafe {
-        g_vector_table[29].fn = Some(fn);
+        g_vector_table[29].r#fn = Some(r#fn);
 
         write_volatile(AUX_ENABLES, 1);
         write_volatile(AUX_MU_IIR, 6);
@@ -86,14 +87,14 @@ fn uart_isr_register(fn: unsafe extern "C" fn()) {
     }
 }
 
-unsafe extern "C" fn uart_isr() {
+pub unsafe extern "C" fn uart_isr() {
     if read_volatile(AUX_MU_LSR) & 1 != 0 {
         let c = read_volatile(AUX_MU_IO) as u8;
         xQueueSendToBackFromISR((*uartctl).rx_queue, &c, core::ptr::null_mut());
     }
 }
 
-fn uart_init() {
+pub fn uart_init() {
     unsafe {
         let mut r = read_volatile(GPFSEL1);
         r &= !(7<<12|7<<15);
@@ -126,21 +127,21 @@ const IRQ_BASIC_PENDING: *mut u32 = 0x3F00B200 as *mut u32;
 const IRQ_PENDING_1: *mut u32 = 0x3F00B204 as *mut u32;
 const IRQ_PENDING_2: *mut u32 = 0x3F00B208 as *mut u32;
 
-fn handle_range(pending: u32, base: u32) {
+pub fn handle_range(pending: u32, base: u32) {
     let mut pending = pending;
     while pending != 0 {
         let bit = 31 - pending.leading_zeros();
         let irq = base + bit;
 
-        if let Some(handler) = unsafe { g_vector_table[irq as usize].fn } {
-            handler();
+        if let Some(handler) = unsafe { g_vector_table[irq as usize].r#fn } {
+            unsafe { handler(); }
         }
 
         pending &= !(1 << bit);
     }
 }
 
-unsafe extern "C" fn irq_handler() {
+pub unsafe extern "C" fn irq_handler() {
     let basic = read_volatile(IRQ_BASIC_PENDING) & 0x00000300;
 
     if basic & 0x100 != 0 {

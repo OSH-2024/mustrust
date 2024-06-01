@@ -2,13 +2,12 @@
 #![no_main]
 #![feature(asm)]
 
-mod bindings;
 mod uart;
 
 use core;
+use core::arch::asm;
 use core::panic::PanicInfo;
 use cty;
-use crate::bindings::*;
 use crate::uart::*;
 
 #[no_mangle]
@@ -18,8 +17,7 @@ pub extern "C" fn io_halt() {
     }
 }
 
-#[no_mangle]
-pub extern "C" fn TaskA(pvParameters: *cty::c_void) {
+fn TaskA(pvParameters: *const cty::c_void) {
     uart_puts("start TaskA\n");
     loop {
         uart_puthex(xTaskGetTickCount());
@@ -28,12 +26,12 @@ pub extern "C" fn TaskA(pvParameters: *cty::c_void) {
     }
 }
 
-static mut timer: TimeHandle_t = 0;
-static mut count: cty::c_uint32_t = 0;
+static mut timer: TimerHandle_t = 0;
+static mut count: cty::uint32_t = 0;
 
 #[no_mangle]
 pub extern "C" fn interval_func(pxTimer: TimerHandle_t) {
-    let mut buf: [cty::c_char, 2] = [0; 2];
+    let mut buf: [cty::c_char; 2] = [0; 2];
     let mut len: cty::c_int = 0;
     len = uart_read_bytes(&mut buf, buf.len() - 1);
     if len > 0 {
@@ -49,8 +47,8 @@ pub extern "C" fn main() -> ! {
 	uart_puts("hello world\n");
     unsafe {
         xTaskCreate(TaskA, "Task A", 512, NULL, tskIDLE_PRIORITY, &mut task_a);
-        timer = xTimerCreate("print_every_10ms", 10 / portTICK_RATE_MS, pdTRUE, NULL as *cty::c_void, interval_func);
-        if (timer != NULL) {
+        timer = xTimerCreate("print_every_10ms", 10 / portTICK_RATE_MS, pdTRUE, 0 as *mut cty::c_void, interval_func);
+        if (timer != 0) {
             xTimerStart(timer, 0);
         }
     }
