@@ -244,14 +244,23 @@ impl List {
         self.number_of_items += 1;
     }
 
-    fn insert_end(&mut self, item_link: WeakItemLink) {
+    // 定义一个函数 `insert_end`，它接受一个弱引用的链表项 `item_link` 作为参数
+fn insert_end(&mut self, item_link: WeakItemLink) {
+        // 获取当前链表索引项的前一个项
         let prev = get_list_item_prev(&self.index);
+        // 克隆当前链表索引项的弱引用
         let next = Weak::clone(&self.index);
+        // 设置 `item_link` 的下一个项为 `next`
         set_list_item_next(&item_link, Weak::clone(&next));
+        // 设置 `item_link` 的前一个项为 `prev`
         set_list_item_prev(&item_link, Weak::clone(&prev));
+        // 设置 `prev` 的下一个项为 `item_link`
         set_list_item_next(&prev, Weak::clone(&item_link));
+        // 设置 `next` 的前一个项为 `item_link`
         set_list_item_prev(&next, Weak::clone(&item_link));
-
+        // 链表项的数量增加 1
         self.number_of_items += 1;
     }
+
+
 }
