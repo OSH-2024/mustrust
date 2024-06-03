@@ -243,4 +243,15 @@ impl List {
 
         self.number_of_items += 1;
     }
+
+    fn insert_end(&mut self, item_link: WeakItemLink) {
+        let prev = get_list_item_prev(&self.index);
+        let next = Weak::clone(&self.index);
+        set_list_item_next(&item_link, Weak::clone(&next));
+        set_list_item_prev(&item_link, Weak::clone(&prev));
+        set_list_item_next(&prev, Weak::clone(&item_link));
+        set_list_item_prev(&next, Weak::clone(&item_link));
+
+        self.number_of_items += 1;
+    }
 }
