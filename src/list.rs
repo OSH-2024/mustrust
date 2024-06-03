@@ -213,3 +213,34 @@ pub fn list_remove(item_link: ItemLink) -> UBaseType {
         .unwrap()
         .remove(Arc::downgrade(&item_link))
 }
+
+impl List {
+    fn insert(&mut self, item_link: WeakItemLink) {
+        println!("in");
+        let value_of_insertion = get_weak_item_value(&item_link);
+        let item_to_insert = if value_of_insertion == portMAX_DELAY {
+            get_list_item_prev(&Arc::downgrade(&self.list_end))
+        } else {
+            let mut iterator = Arc::downgrade(&self.list_end);
+            loop {
+                /* There is nothing to do here, just iterating to the wanted
+                insertion position. */
+                let next = get_list_item_next(&iterator);
+                if get_weak_item_value(&next) > value_of_insertion {
+                    break iterator;
+                }
+                iterator = next;
+            }
+        };
+
+        let prev = Weak::clone(&item_to_insert);
+        let next = get_list_item_next(&item_to_insert);
+
+        set_list_item_next(&item_link, Weak::clone(&next));
+        set_list_item_prev(&item_link, Weak::clone(&prev));
+        set_list_item_next(&prev, Weak::clone(&item_link));
+        set_list_item_prev(&next, Weak::clone(&item_link));
+
+        self.number_of_items += 1;
+    }
+}
