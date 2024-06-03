@@ -215,52 +215,63 @@ pub fn list_remove(item_link: ItemLink) -> UBaseType {
 }
 
 impl List {
+    // 定义一个函数 `insert`，它接受一个弱引用的链表项 `item_link` 作为参数
     fn insert(&mut self, item_link: WeakItemLink) {
+        // 打印调试信息
         println!("in");
+        // 获取待插入项的值
         let value_of_insertion = get_weak_item_value(&item_link);
+        // 根据待插入项的值决定插入的位置
         let item_to_insert = if value_of_insertion == portMAX_DELAY {
+            // 如果待插入项的值等于 `portMAX_DELAY`，则插入到链表的末尾
             get_list_item_prev(&Arc::downgrade(&self.list_end))
         } else {
+            // 否则，从链表的末尾开始遍历链表
             let mut iterator = Arc::downgrade(&self.list_end);
             loop {
-                /* There is nothing to do here, just iterating to the wanted
-                insertion position. */
+                // 获取当前项的下一个项
                 let next = get_list_item_next(&iterator);
+                // 如果下一个项的值大于待插入项的值，那么就在当前位置插入待插入项
                 if get_weak_item_value(&next) > value_of_insertion {
                     break iterator;
                 }
+                // 否则，继续遍历链表
                 iterator = next;
             }
         };
 
+        // 获取待插入位置的前一个项和下一个项
         let prev = Weak::clone(&item_to_insert);
         let next = get_list_item_next(&item_to_insert);
 
+        // 设置待插入项的前一个项和下一个项
         set_list_item_next(&item_link, Weak::clone(&next));
         set_list_item_prev(&item_link, Weak::clone(&prev));
+        // 设置前一个项的下一个项和下一个项的前一个项为待插入项
         set_list_item_next(&prev, Weak::clone(&item_link));
         set_list_item_prev(&next, Weak::clone(&item_link));
 
+        // 链表项的数量增加 1
         self.number_of_items += 1;
     }
 
     // 定义一个函数 `insert_end`，它接受一个弱引用的链表项 `item_link` 作为参数
-fn insert_end(&mut self, item_link: WeakItemLink) {
-        // 获取当前链表索引项的前一个项
-        let prev = get_list_item_prev(&self.index);
-        // 克隆当前链表索引项的弱引用
-        let next = Weak::clone(&self.index);
-        // 设置 `item_link` 的下一个项为 `next`
-        set_list_item_next(&item_link, Weak::clone(&next));
-        // 设置 `item_link` 的前一个项为 `prev`
-        set_list_item_prev(&item_link, Weak::clone(&prev));
-        // 设置 `prev` 的下一个项为 `item_link`
-        set_list_item_next(&prev, Weak::clone(&item_link));
-        // 设置 `next` 的前一个项为 `item_link`
-        set_list_item_prev(&next, Weak::clone(&item_link));
-        // 链表项的数量增加 1
-        self.number_of_items += 1;
-    }
+    fn insert_end(&mut self, item_link: WeakItemLink) {
+            // 获取当前链表索引项的前一个项
+            let prev = get_list_item_prev(&self.index);
+            // 克隆当前链表索引项的弱引用
+            let next = Weak::clone(&self.index);
+            // 设置 `item_link` 的下一个项为 `next`
+            set_list_item_next(&item_link, Weak::clone(&next));
+            // 设置 `item_link` 的前一个项为 `prev`
+            set_list_item_prev(&item_link, Weak::clone(&prev));
+            // 设置 `prev` 的下一个项为 `item_link`
+            set_list_item_next(&prev, Weak::clone(&item_link));
+            // 设置 `next` 的前一个项为 `item_link`
+            set_list_item_prev(&next, Weak::clone(&item_link));
+            // 链表项的数量增加 1
+            self.number_of_items += 1;
+        }
 
 
 }
