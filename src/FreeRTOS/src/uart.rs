@@ -68,6 +68,7 @@ fn uart_read_bytes(buf: &mut [u8], length: u32) -> u32 {
 
 type InterruptHandler = Option<unsafe extern "C" fn()>;
 
+#[derive(Copy, Clone)]
 struct InterruptVector {
     fn: InterruptHandler,
 }
