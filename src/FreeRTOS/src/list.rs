@@ -316,3 +316,26 @@ impl List {
         owner
     }
 }
+
+
+// 将节点按照升序排列插入到链表
+pub fn vListInsert(list: &ListLink, item_link: &ItemLink) {
+    item_link.write().unwrap().set_container(&list);
+    println!("Set conatiner");
+    list.write().unwrap().insert(Arc::downgrade(&item_link))
+}
+
+
+// list_insert_end
+pub fn vListInsertEnd(list: &ListLink, item_link: &ItemLink) {
+    item_link.write().unwrap().set_container(&list);
+    list.write().unwrap().insert_end(Arc::downgrade(&item_link))
+}
+
+// list_remove
+pub fn uxListRemove(item_link: ItemLink) -> UBaseType_t {
+    item_link
+        .write()
+        .unwrap()
+        .remove(Arc::downgrade(&item_link))
+}
