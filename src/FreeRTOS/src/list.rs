@@ -306,4 +306,13 @@ impl List {
         let owner = Weak::clone(&owned_index.read().unwrap().owner);
         owner
     }
+
+    fn get_owner_of_head_entry(&self) -> Weak<RwLock<TCB>> {
+        let list_end = get_list_item_next(&Arc::downgrade(&self.list_end));
+        let owned_index = list_end
+            .upgrade()
+            .unwrap_or_else(|| panic!("List item is None"));
+        let owner = Weak::clone(&owned_index.read().unwrap().owner);
+        owner
+    }
 }
