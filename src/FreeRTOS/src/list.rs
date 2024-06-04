@@ -289,4 +289,11 @@ impl List {
     fn get_length(&self) -> UBaseType {
         self.number_of_items
     }
+
+    fn increment_index(&mut self) {
+        self.index = get_list_item_next(&self.index);
+        if Weak::ptr_eq(&self.index, &Arc::downgrade(&self.list_end)) {
+            self.index = get_list_item_next(&self.index);
+        }
+    }
 }
