@@ -281,4 +281,12 @@ impl List {
         self.number_of_items -= 1;
         self.number_of_items
     }
+
+    fn is_empty(&self) -> bool {
+        self.number_of_items == 0
+    }
+
+    fn get_length(&self) -> UBaseType {
+        self.number_of_items
+    }
 }
