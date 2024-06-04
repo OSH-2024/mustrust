@@ -296,4 +296,14 @@ impl List {
             self.index = get_list_item_next(&self.index);
         }
     }
+
+    fn get_owner_of_next_entry(&mut self) -> Weak<RwLock<TCB>> {
+        self.increment_index();
+        let owned_index = self
+            .index
+            .upgrade()
+            .unwrap_or_else(|| panic!("List item is None"));
+        let owner = Weak::clone(&owned_index.read().unwrap().owner);
+        owner
+    }
 }
