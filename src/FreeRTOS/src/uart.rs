@@ -1,7 +1,6 @@
-include!("bindings.rs");
-
 use core::arch::asm;
 use core::ptr::*;
+use crate::bindings;
 
 /* Defines */
 pub const GPFSEL1: *mut u32 = 0x3F200004 as *mut u32;
@@ -16,27 +15,27 @@ pub const AUX_MU_LSR: *mut u32 = 0x3F215054 as *mut u32;
 pub const AUX_MU_BAUD: *mut u32 = 0x3F215068 as *mut u32;
 
 struct UARTCTL {
-    tx_mux: SemaphoreHandle_t,
-    rx_queue: QueueHandle_t
+    tx_mux: bindings::SemaphoreHandle_t,
+    rx_queue: bindings::QueueHandle_t
 }
 
 static mut uartctl: *mut UARTCTL = 0 as *mut UARTCTL;
 
 pub fn uart_putchar(c: u8) {
     unsafe {
-        xSemaphoreTake((*uartctl).tx_mux, portMAX_DELAY);
+        bindings::xSemaphoreTake((*uartctl).tx_mux, bindings::portMAX_DELAY);
         while (read_volatile(AUX_MU_LSR) & 0x20) == 0 {}
         write_volatile(AUX_MU_IO, c as u32);
-        xSemaphoreGive((*uartctl).tx_mux);
+        bindings::xSemaphoreGive((*uartctl).tx_mux);
     }
 }
 
 pub fn uart_putchar_isr(c: u8) {
     unsafe {
-        xSemaphoreTakeFromISR((*uartctl).tx_mux, core::ptr::null_mut());
+        bindings::xSemaphoreTakeFromISR((*uartctl).tx_mux, core::ptr::null_mut());
         while (read_volatile(AUX_MU_LSR) & 0x20) == 0 {}
         write_volatile(AUX_MU_IO, c as u32);
-        xSemaphoreGiveFromISR((*uartctl).tx_mux, core::ptr::null_mut());
+        bindings::xSemaphoreGiveFromISR((*uartctl).tx_mux, core::ptr::null_mut());
     }
 }
 
@@ -54,12 +53,12 @@ pub fn uart_puthex(v: u64) {
 }
 
 pub fn uart_read_bytes(buf: &mut [u8], length: u32) -> u32 {
-    let num: u32 = unsafe { uxQueueMessagesWaiting((*uartctl).rx_queue) } as u32;
+    let num: u32 = unsafe { bindings::uxQueueMessagesWaiting((*uartctl).rx_queue) } as u32;
     let mut i: u32 = 0;
 
     while i < num && i < length {
         unsafe {
-            xQueueReceive((*uartctl).rx_queue, *(&mut buf[i as usize]) as *mut cty::c_void, portMAX_DELAY);
+            bindings::xQueueReceive((*uartctl).rx_queue, *(&mut buf[i as usize]) as *mut cty::c_void, bindings::portMAX_DELAY);
         }
         i += 1;
     }
@@ -92,7 +91,7 @@ pub fn uart_isr_register(r#fn: unsafe extern "C" fn()) {
 pub unsafe extern "C" fn uart_isr() {
     if read_volatile(AUX_MU_LSR) & 1 != 0 {
         let c = read_volatile(AUX_MU_IO) as u8;
-        xQueueSendToBackFromISR((*uartctl).rx_queue, *(&c) as *mut cty::c_void, core::ptr::null_mut());
+        bindings::xQueueSendToBackFromISR((*uartctl).rx_queue, *(&c) as *mut cty::c_void, core::ptr::null_mut());
     }
 }
 
@@ -118,9 +117,9 @@ pub fn uart_init() {
         write_volatile(AUX_MU_BAUD, 270);
         write_volatile(AUX_MU_LCR, 3);
 
-        uartctl = pvPortMalloc(core::mem::size_of::<UARTCTL>() as usize) as *mut UARTCTL;
-        (*uartctl).tx_mux = xSemaphoreCreateMutex();
-        (*uartctl).rx_queue = xQueueCreate(16, core::mem::size_of::<u8>() as u64);
+        uartctl = bindings::pvPortMalloc(core::mem::size_of::<UARTCTL>() as usize) as *mut UARTCTL;
+        (*uartctl).tx_mux = bindings::xSemaphoreCreateMutex();
+        (*uartctl).rx_queue = bindings::xQueueCreate(16, core::mem::size_of::<u8>() as u64);
         uart_isr_register(uart_isr);
     }
 }

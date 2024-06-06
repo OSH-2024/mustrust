@@ -2,7 +2,9 @@
 #![no_main]
 #![feature(asm)]
 
+mod bindings;
 mod uart;
+mod FreeRTOS_tick_config;
 
 use core;
 use core::arch::asm;
@@ -21,18 +23,18 @@ pub extern "C" fn TaskA(pvParameters: *mut cty::c_void) {
     unsafe {
         uart_puts("start TaskA\n");
         loop {
-            uart_puthex(xTaskGetTickCount());
+            uart_puthex(bindings::xTaskGetTickCount());
             uart_putchar(b'\n');
-            vTaskDelay((500 / portTICK_RATE_MS) as u64);
+            bindings::vTaskDelay((500 / bindings::portTICK_RATE_MS) as u64);
         }
     }
 }
 
-static mut timer: TimerHandle_t = 0 as *mut cty::c_void;
+static mut timer: bindings::TimerHandle_t = 0 as *mut cty::c_void;
 static mut count: cty::uint32_t = 0;
 
 #[no_mangle]
-pub extern "C" fn interval_func(pxTimer: TimerHandle_t) {
+pub extern "C" fn interval_func(pxTimer: bindings::TimerHandle_t) {
     let mut buf: [cty::c_char; 2] = [0; 2];
     let mut len: cty::c_uint = 0;
     let buf_len: u32 = (buf.len() - 1) as u32;
@@ -49,16 +51,16 @@ pub extern "C" fn main() -> ! {
     let task_name = b"TaskA\0".as_ptr() as *const cty::c_char;
     let timer_name = b"print_every_10ms\0".as_ptr() as *const cty::c_char;
     unsafe {
-        let mut task_a: TaskHandle_t = 0 as *mut cty::c_void;
+        let mut task_a: bindings::TaskHandle_t = 0 as *mut cty::c_void;
         uart_init();
         uart_puts("qemu exit: Ctrl-A x / qemu monitor: Ctrl-A c\n");
         uart_puts("hello world\n");
-        xTaskCreate(Some(TaskA), task_name, 512, 0 as *mut cty::c_void, tskIDLE_PRIORITY as u64, &mut task_a);
-        timer = xTimerCreate(timer_name, (10 / portTICK_RATE_MS) as u64, pdTRUE as u64, 0 as *mut cty::c_void, Some(interval_func));
+        bindings::xTaskCreate(Some(TaskA), task_name, 512, 0 as *mut cty::c_void, bindings::tskIDLE_PRIORITY as u64, &mut task_a);
+        timer = bindings::xTimerCreate(timer_name, (10 / bindings::portTICK_RATE_MS) as u64, bindings::pdTRUE as u64, 0 as *mut cty::c_void, Some(interval_func));
         if timer != (0 as *mut cty::c_void) {
-            xTimerStart(timer, 0);
+            bindings::xTimerStart(timer, 0);
         }
-	    vTaskStartScheduler();
+	    bindings::vTaskStartScheduler();
     }
     loop {}
 }
@@ -73,5 +75,8 @@ fn panic(_info: &PanicInfo) -> ! {
     loop {}
 }
 
+#[no_mangle]
 fn vApplicationIdleHook() {}
+
+#[no_mangle]
 fn vApplicationTickHook() {}

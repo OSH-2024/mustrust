@@ -41,6 +41,8 @@
  * These settings should not be altered.
  *-----------------------------------------------------------
  */
+#include <stddef.h>
+#include <stdint.h>
 
 /* Type definitions. */
 #define portCHAR		char
