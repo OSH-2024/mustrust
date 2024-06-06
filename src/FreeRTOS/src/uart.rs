@@ -69,6 +69,7 @@ pub fn uart_read_bytes(buf: &mut [u8], length: u32) -> u32 {
 
 type InterruptHandler = Option<unsafe extern "C" fn()>;
 
+#[derive(Copy, Clone)]
 struct InterruptVector {
     r#fn: InterruptHandler,
 }
@@ -91,7 +92,7 @@ pub fn uart_isr_register(r#fn: unsafe extern "C" fn()) {
 pub unsafe extern "C" fn uart_isr() {
     if read_volatile(AUX_MU_LSR) & 1 != 0 {
         let c = read_volatile(AUX_MU_IO) as u8;
-        xQueueSendToBackFromISR((*uartctl).rx_queue, &c, core::ptr::null_mut());
+        xQueueSendToBackFromISR((*uartctl).rx_queue, *(&c) as *mut cty::c_void, core::ptr::null_mut());
     }
 }
 
@@ -119,7 +120,7 @@ pub fn uart_init() {
 
         uartctl = pvPortMalloc(core::mem::size_of::<UARTCTL>() as usize) as *mut UARTCTL;
         (*uartctl).tx_mux = xSemaphoreCreateMutex();
-        (*uartctl).rx_queue = xQueueCreate(16, core::mem::size_of::<u8>() as u32);
+        (*uartctl).rx_queue = xQueueCreate(16, core::mem::size_of::<u8>() as u64);
         uart_isr_register(uart_isr);
     }
 }

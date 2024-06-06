@@ -72,77 +72,6 @@ typedef void * QueueSetMemberHandle_t;
 #define queueQUEUE_TYPE_BINARY_SEMAPHORE	( ( uint8_t ) 3U )
 #define queueQUEUE_TYPE_RECURSIVE_MUTEX		( ( uint8_t ) 4U )
 
-/**
- * queue. h
- * <pre>
- QueueHandle_t xQueueCreate(
-							  UBaseType_t uxQueueLength,
-							  UBaseType_t uxItemSize
-						  );
- * </pre>
- *
- * Creates a new queue instance, and returns a handle by which the new queue
- * can be referenced.
- *
- * Internally, within the FreeRTOS implementation, queues use two blocks of
- * memory.  The first block is used to hold the queue's data structures.  The
- * second block is used to hold items placed into the queue.  If a queue is
- * created using xQueueCreate() then both blocks of memory are automatically
- * dynamically allocated inside the xQueueCreate() function.  (see
- * http://www.freertos.org/a00111.html).  If a queue is created using
- * xQueueCreateStatic() then the application writer must provide the memory that
- * will get used by the queue.  xQueueCreateStatic() therefore allows a queue to
- * be created without using any dynamic memory allocation.
- *
- * http://www.FreeRTOS.org/Embedded-RTOS-Queues.html
- *
- * @param uxQueueLength The maximum number of items that the queue can contain.
- *
- * @param uxItemSize The number of bytes each item in the queue will require.
- * Items are queued by copy, not by reference, so this is the number of bytes
- * that will be copied for each posted item.  Each item on the queue must be
- * the same size.
- *
- * @return If the queue is successfully create then a handle to the newly
- * created queue is returned.  If the queue cannot be created then 0 is
- * returned.
- *
- * Example usage:
-   <pre>
- struct AMessage
- {
-	char ucMessageID;
-	char ucData[ 20 ];
- };
-
- void vATask( void *pvParameters )
- {
- QueueHandle_t xQueue1, xQueue2;
-
-	// Create a queue capable of containing 10 uint32_t values.
-	xQueue1 = xQueueCreate( 10, sizeof( uint32_t ) );
-	if( xQueue1 == 0 )
-	{
-		// Queue was not created and must not be used.
-	}
-
-	// Create a queue capable of containing 10 pointers to AMessage structures.
-	// These should be passed by pointer as they contain a lot of data.
-	xQueue2 = xQueueCreate( 10, sizeof( struct AMessage * ) );
-	if( xQueue2 == 0 )
-	{
-		// Queue was not created and must not be used.
-	}
-
-	// ... Rest of task code.
- }
- </pre>
- * \defgroup xQueueCreate xQueueCreate
- * \ingroup QueueManagement
- */
-#if( configSUPPORT_DYNAMIC_ALLOCATION == 1 )
-	#define xQueueCreate( uxQueueLength, uxItemSize ) xQueueGenericCreate( ( uxQueueLength ), ( uxItemSize ), ( queueQUEUE_TYPE_BASE ) )
-#endif
 
 /**
  * queue. h
@@ -982,75 +911,6 @@ void vQueueDelete( QueueHandle_t xQueue ) PRIVILEGED_FUNCTION;
 #define xQueueSendToFrontFromISR( xQueue, pvItemToQueue, pxHigherPriorityTaskWoken ) xQueueGenericSendFromISR( ( xQueue ), ( pvItemToQueue ), ( pxHigherPriorityTaskWoken ), queueSEND_TO_FRONT )
 
 
-/**
- * queue. h
- * <pre>
- BaseType_t xQueueSendToBackFromISR(
-										 QueueHandle_t xQueue,
-										 const void *pvItemToQueue,
-										 BaseType_t *pxHigherPriorityTaskWoken
-									  );
- </pre>
- *
- * This is a macro that calls xQueueGenericSendFromISR().
- *
- * Post an item to the back of a queue.  It is safe to use this macro from
- * within an interrupt service routine.
- *
- * Items are queued by copy not reference so it is preferable to only
- * queue small items, especially when called from an ISR.  In most cases
- * it would be preferable to store a pointer to the item being queued.
- *
- * @param xQueue The handle to the queue on which the item is to be posted.
- *
- * @param pvItemToQueue A pointer to the item that is to be placed on the
- * queue.  The size of the items the queue will hold was defined when the
- * queue was created, so this many bytes will be copied from pvItemToQueue
- * into the queue storage area.
- *
- * @param pxHigherPriorityTaskWoken xQueueSendToBackFromISR() will set
- * *pxHigherPriorityTaskWoken to pdTRUE if sending to the queue caused a task
- * to unblock, and the unblocked task has a priority higher than the currently
- * running task.  If xQueueSendToBackFromISR() sets this value to pdTRUE then
- * a context switch should be requested before the interrupt is exited.
- *
- * @return pdTRUE if the data was successfully sent to the queue, otherwise
- * errQUEUE_FULL.
- *
- * Example usage for buffered IO (where the ISR can obtain more than one value
- * per call):
-   <pre>
- void vBufferISR( void )
- {
- char cIn;
- BaseType_t xHigherPriorityTaskWoken;
-
-	// We have not woken a task at the start of the ISR.
-	xHigherPriorityTaskWoken = pdFALSE;
-
-	// Loop until the buffer is empty.
-	do
-	{
-		// Obtain a byte from the buffer.
-		cIn = portINPUT_BYTE( RX_REGISTER_ADDRESS );
-
-		// Post the byte.
-		xQueueSendToBackFromISR( xRxQueue, &cIn, &xHigherPriorityTaskWoken );
-
-	} while( portINPUT_BYTE( BUFFER_COUNT ) );
-
-	// Now the buffer is empty we can switch context if necessary.
-	if( xHigherPriorityTaskWoken )
-	{
-		taskYIELD ();
-	}
- }
- </pre>
- *
- * \defgroup xQueueSendFromISR xQueueSendFromISR
- * \ingroup QueueManagement
- */
-#define xQueueSendToBackFromISR( xQueue, pvItemToQueue, pxHigherPriorityTaskWoken ) xQueueGenericSendFromISR( ( xQueue ), ( pvItemToQueue ), ( pxHigherPriorityTaskWoken ), queueSEND_TO_BACK )
 
 /**
  * queue. h
@@ -1296,6 +1156,85 @@ BaseType_t xQueueGiveFromISR( QueueHandle_t xQueue, BaseType_t * const pxHigherP
 /**
  * queue. h
  * <pre>
+ BaseType_t xQueueSendToBackFromISR(
+										 QueueHandle_t xQueue,
+										 const void *pvItemToQueue,
+										 BaseType_t *pxHigherPriorityTaskWoken
+									  );
+ </pre>
+ *
+ * This is a macro that calls xQueueGenericSendFromISR().
+ *
+ * Post an item to the back of a queue.  It is safe to use this macro from
+ * within an interrupt service routine.
+ *
+ * Items are queued by copy not reference so it is preferable to only
+ * queue small items, especially when called from an ISR.  In most cases
+ * it would be preferable to store a pointer to the item being queued.
+ *
+ * @param xQueue The handle to the queue on which the item is to be posted.
+ *
+ * @param pvItemToQueue A pointer to the item that is to be placed on the
+ * queue.  The size of the items the queue will hold was defined when the
+ * queue was created, so this many bytes will be copied from pvItemToQueue
+ * into the queue storage area.
+ *
+ * @param pxHigherPriorityTaskWoken xQueueSendToBackFromISR() will set
+ * *pxHigherPriorityTaskWoken to pdTRUE if sending to the queue caused a task
+ * to unblock, and the unblocked task has a priority higher than the currently
+ * running task.  If xQueueSendToBackFromISR() sets this value to pdTRUE then
+ * a context switch should be requested before the interrupt is exited.
+ *
+ * @return pdTRUE if the data was successfully sent to the queue, otherwise
+ * errQUEUE_FULL.
+ *
+ * Example usage for buffered IO (where the ISR can obtain more than one value
+ * per call):
+   <pre>
+ void vBufferISR( void )
+ {
+ char cIn;
+ BaseType_t xHigherPriorityTaskWoken;
+
+	// We have not woken a task at the start of the ISR.
+	xHigherPriorityTaskWoken = pdFALSE;
+
+	// Loop until the buffer is empty.
+	do
+	{
+		// Obtain a byte from the buffer.
+		cIn = portINPUT_BYTE( RX_REGISTER_ADDRESS );
+
+		// Post the byte.
+		xQueueSendToBackFromISR( xRxQueue, &cIn, &xHigherPriorityTaskWoken );
+
+	} while( portINPUT_BYTE( BUFFER_COUNT ) );
+
+	// Now the buffer is empty we can switch context if necessary.
+	if( xHigherPriorityTaskWoken )
+	{
+		taskYIELD ();
+	}
+ }
+ </pre>
+ *
+ * \defgroup xQueueSendFromISR xQueueSendFromISR
+ * \ingroup QueueManagement
+ */
+// #define xQueueSendToBackFromISR( xQueue, pvItemToQueue, pxHigherPriorityTaskWoken ) xQueueGenericSendFromISR( ( xQueue ), ( pvItemToQueue ), ( pxHigherPriorityTaskWoken ), queueSEND_TO_BACK )
+
+ BaseType_t xQueueSendToBackFromISR(
+										 QueueHandle_t xQueue,
+										 const void *pvItemToQueue,
+										 BaseType_t *pxHigherPriorityTaskWoken
+									  ) {
+		return xQueueGenericSendFromISR( xQueue, pvItemToQueue, pxHigherPriorityTaskWoken, queueSEND_TO_BACK );
+									  }
+
+
+/**
+ * queue. h
+ * <pre>
  BaseType_t xQueueReceiveFromISR(
 									   QueueHandle_t	xQueue,
 									   void	*pvBuffer,
@@ -1502,6 +1441,81 @@ BaseType_t xQueueGiveMutexRecursive( QueueHandle_t pxMutex ) PRIVILEGED_FUNCTION
 #if( configSUPPORT_STATIC_ALLOCATION == 1 )
 	QueueHandle_t xQueueGenericCreateStatic( const UBaseType_t uxQueueLength, const UBaseType_t uxItemSize, uint8_t *pucQueueStorage, StaticQueue_t *pxStaticQueue, const uint8_t ucQueueType ) PRIVILEGED_FUNCTION;
 #endif
+
+/**
+ * queue. h
+ * <pre>
+ QueueHandle_t xQueueCreate(
+							  UBaseType_t uxQueueLength,
+							  UBaseType_t uxItemSize
+						  );
+ * </pre>
+ *
+ * Creates a new queue instance, and returns a handle by which the new queue
+ * can be referenced.
+ *
+ * Internally, within the FreeRTOS implementation, queues use two blocks of
+ * memory.  The first block is used to hold the queue's data structures.  The
+ * second block is used to hold items placed into the queue.  If a queue is
+ * created using xQueueCreate() then both blocks of memory are automatically
+ * dynamically allocated inside the xQueueCreate() function.  (see
+ * http://www.freertos.org/a00111.html).  If a queue is created using
+ * xQueueCreateStatic() then the application writer must provide the memory that
+ * will get used by the queue.  xQueueCreateStatic() therefore allows a queue to
+ * be created without using any dynamic memory allocation.
+ *
+ * http://www.FreeRTOS.org/Embedded-RTOS-Queues.html
+ *
+ * @param uxQueueLength The maximum number of items that the queue can contain.
+ *
+ * @param uxItemSize The number of bytes each item in the queue will require.
+ * Items are queued by copy, not by reference, so this is the number of bytes
+ * that will be copied for each posted item.  Each item on the queue must be
+ * the same size.
+ *
+ * @return If the queue is successfully create then a handle to the newly
+ * created queue is returned.  If the queue cannot be created then 0 is
+ * returned.
+ *
+ * Example usage:
+   <pre>
+ struct AMessage
+ {
+	char ucMessageID;
+	char ucData[ 20 ];
+ };
+
+ void vATask( void *pvParameters )
+ {
+ QueueHandle_t xQueue1, xQueue2;
+
+	// Create a queue capable of containing 10 uint32_t values.
+	xQueue1 = xQueueCreate( 10, sizeof( uint32_t ) );
+	if( xQueue1 == 0 )
+	{
+		// Queue was not created and must not be used.
+	}
+
+	// Create a queue capable of containing 10 pointers to AMessage structures.
+	// These should be passed by pointer as they contain a lot of data.
+	xQueue2 = xQueueCreate( 10, sizeof( struct AMessage * ) );
+	if( xQueue2 == 0 )
+	{
+		// Queue was not created and must not be used.
+	}
+
+	// ... Rest of task code.
+ }
+ </pre>
+ * \defgroup xQueueCreate xQueueCreate
+ * \ingroup QueueManagement
+ */
+#if( configSUPPORT_DYNAMIC_ALLOCATION == 1 )
+	QueueHandle_t xQueueCreate( const UBaseType_t uxQueueLength, const UBaseType_t uxItemSize ) {
+		return xQueueGenericCreate( ( uxQueueLength ), ( uxItemSize ), ( queueQUEUE_TYPE_BASE ) );
+	}
+#endif
+
 
 /*
  * Queue sets provide a mechanism to allow a task to block (pend) on a read

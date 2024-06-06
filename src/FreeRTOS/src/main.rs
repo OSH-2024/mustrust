@@ -35,26 +35,31 @@ static mut count: cty::uint32_t = 0;
 pub extern "C" fn interval_func(pxTimer: TimerHandle_t) {
     let mut buf: [cty::c_char; 2] = [0; 2];
     let mut len: cty::c_uint = 0;
-    len = uart_read_bytes(&mut buf, (buf.len() - 1) as u32);
+    let buf_len: u32 = (buf.len() - 1) as u32;
+    len = uart_read_bytes(&mut buf, buf_len as u32);
     if len > 0 {
-        uart_puts(&buf);
+        if let Ok(nbuf) = core::str::from_utf8(&buf) {
+            uart_puts(&nbuf);
+        }
     }
 }
 
 #[no_mangle]
 pub extern "C" fn main() -> ! {
+    let task_name = b"TaskA\0".as_ptr() as *const cty::c_char;
+    let timer_name = b"print_every_10ms\0".as_ptr() as *const cty::c_char;
     unsafe {
-        let task_a: TaskHandle_t = 0 as *mut cty::c_void;
+        let mut task_a: TaskHandle_t = 0 as *mut cty::c_void;
         uart_init();
         uart_puts("qemu exit: Ctrl-A x / qemu monitor: Ctrl-A c\n");
         uart_puts("hello world\n");
-        xTaskCreate(Some(TaskA), "Task A", 512, 0 as *mut cty::c_void, tskIDLE_PRIORITY as u64, &mut task_a);
-        timer = xTimerCreate("print_every_10ms", (10 / portTICK_RATE_MS) as u64, pdTRUE as u64, 0 as *mut cty::c_void, Some(interval_func));
+        xTaskCreate(Some(TaskA), task_name, 512, 0 as *mut cty::c_void, tskIDLE_PRIORITY as u64, &mut task_a);
+        timer = xTimerCreate(timer_name, (10 / portTICK_RATE_MS) as u64, pdTRUE as u64, 0 as *mut cty::c_void, Some(interval_func));
         if timer != (0 as *mut cty::c_void) {
             xTimerStart(timer, 0);
         }
+	    vTaskStartScheduler();
     }
-	vTaskStartScheduler();
     loop {}
 }
 
