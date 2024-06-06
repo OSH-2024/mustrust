@@ -21,8 +21,8 @@ fn main() {
         .flag("-ffreestanding")
         .flag("-O2")
         .flag("-std=gnu11")
-        .target("aarch64-none-elf")
         .flag("-T").flag("raspberrypi3.ld")
+        .target("aarch64-none-elf")
         .compile("wrapper");
-        println!("cargo:rustc-link-search=wrapper");
+        // println!("cargo:rustc-link-search=wrapper");
 }
