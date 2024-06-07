@@ -41,18 +41,25 @@ definition here is not suitable for your application. */
 	#define pdMS_TO_TICKS( xTimeInMs ) ( ( TickType_t ) ( ( ( TickType_t ) ( xTimeInMs ) * ( TickType_t ) configTICK_RATE_HZ ) / ( TickType_t ) 1000 ) )
 #endif
 
-const int pdFALSE = 0;
-const int pdTRUE = 1;
+//const int pdFALSE = 0;
+//const int pdTRUE = 1;
+#define	pdFALSE 0
+#define pdTRUE	1
 
 #define pdPASS			( pdTRUE )
 #define pdFAIL			( pdFALSE )
-const int errQUEUE_EMPTY = 0;
-const int errQUEUE_FULL = 0;
+//const int errQUEUE_EMPTY = 0;
+//const int errQUEUE_FULL = 0;
+#define errQUEUE_EMPTY	0
+#define errQUEUE_FULL	1
 
 /* FreeRTOS error definitions. */
-const int errCOULD_NOT_ALLOCATE_REQUIRED_MEMORY = -1;
-const int errQUEUE_BLOCKED = -4;
-const int errQUEUE_YIELD = -5;
+//const int errCOULD_NOT_ALLOCATE_REQUIRED_MEMORY = -1;
+//const int errQUEUE_BLOCKED = -4;
+//const int errQUEUE_YIELD = -5;
+#define errCOULD_NOT_ALLOCATE_REQUIRED_MEMORY	-1
+#define errQUEUE_BLOCKED						-4
+#define errQUEUE_YIELD							-5
 
 /* Macros used for basic data corruption checks. */
 #ifndef configUSE_LIST_DATA_INTEGRITY_CHECK_BYTES
