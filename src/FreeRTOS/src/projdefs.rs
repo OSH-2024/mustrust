@@ -68,8 +68,5 @@ itself. */
 macro_rules! pdFREERTOS_LITTLE_ENDIAN { () => { 0 } }
 macro_rules! pdFREERTOS_BIG_ENDIAN { () => { 1 } }
 
-/* Re-defining endian values for generic naming. */
-macro_rules! pdLITTLE_ENDIAN { () => { pdFREERTOS_LITTLE_ENDIAN } }
-macro_rules! pdBIG_ENDIAN { () => { pdFREERTOS_BIG_ENDIAN } }
 
 
