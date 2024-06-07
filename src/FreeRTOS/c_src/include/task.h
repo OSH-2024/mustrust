@@ -151,7 +151,8 @@ typedef enum
  *
  * \ingroup TaskUtils
  */
-const unsigned tskIDLE_PRIORITY = 0;
+//const unsigned tskIDLE_PRIORITY = 0;
+#define tskIDLE_PRIORITY 0
 
 /**
  * task. h
