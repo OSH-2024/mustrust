@@ -130,3 +130,6 @@ macro_rules! pdBIG_ENDIAN { () => { pdFREERTOS_BIG_ENDIAN!() } }
 
 #[macro_export]
 macro_rules! portMAX_DELAY { () => { 0xffffffffffffffff as u64 } }
+
+#[macro_export]
+macro_rules! tskIDLE_PRIORITY { () => { 0 } }
