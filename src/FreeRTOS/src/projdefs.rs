@@ -121,14 +121,11 @@ macro_rules! pdFREERTOS_LITTLE_ENDIAN { () => { 0 } }
 #[macro_export]
 macro_rules! pdFREERTOS_BIG_ENDIAN { () => { 1 } }
 
-<<<<<<< Updated upstream
-=======
 /* Re-defining endian values for generic naming. */
 #[macro_export]
 macro_rules! pdLITTLE_ENDIAN { () => { pdFREERTOS_LITTLE_ENDIAN!() } }
 #[macro_export]
 macro_rules! pdBIG_ENDIAN { () => { pdFREERTOS_BIG_ENDIAN!() } }
->>>>>>> Stashed changes
 
 
 #[macro_export]
