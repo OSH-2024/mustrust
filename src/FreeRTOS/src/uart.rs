@@ -23,7 +23,7 @@ static mut uartctl: *mut UARTCTL = 0 as *mut UARTCTL;
 
 pub fn uart_putchar(c: u8) {
     unsafe {
-        bindings::xSemaphoreTake((*uartctl).tx_mux, bindings::portMAX_DELAY);
+        bindings::xSemaphoreTake((*uartctl).tx_mux, crate::portMAX_DELAY!());
         while (read_volatile(AUX_MU_LSR) & 0x20) == 0 {}
         write_volatile(AUX_MU_IO, c as u32);
         bindings::xSemaphoreGive((*uartctl).tx_mux);
@@ -58,7 +58,7 @@ pub fn uart_read_bytes(buf: &mut [u8], length: u32) -> u32 {
 
     while i < num && i < length {
         unsafe {
-            bindings::xQueueReceive((*uartctl).rx_queue, *(&mut buf[i as usize]) as *mut cty::c_void, bindings::portMAX_DELAY);
+            bindings::xQueueReceive((*uartctl).rx_queue, *(&mut buf[i as usize]) as *mut cty::c_void, crate::portMAX_DELAY!());
         }
         i += 1;
     }

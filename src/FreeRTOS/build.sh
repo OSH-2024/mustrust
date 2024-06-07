@@ -1,4 +1,4 @@
-rm build/*
+rm -r build/*
 
 bindgen --ctypes-prefix=cty --use-core c_src/wrapper.c -o src/bindings.rs -- -I c_src/include -I c_src/portable/GCC/ARM_CA53_64_RaspberryPi3
 aarch64-none-elf-as -mcpu=cortex-a53 -c -o build/FreeRTOS_asm_vector.o c_src/FreeRTOS_asm_vector.S

@@ -77,46 +77,6 @@ definition here is not suitable for your application. */
 
 /* The following errno values are used by FreeRTOS+ components, not FreeRTOS
 itself. */
-//const int pdFREERTOS_ERRNO_NONE = 0;	/* No errors */
-//const int pdFREERTOS_ERRNO_ENOENT = 2	/* No such file or directory */;
-//const int pdFREERTOS_ERRNO_EINTR = 4	/* Interrupted system call */;
-//const int pdFREERTOS_ERRNO_EIO = 5	/* I/O error */;
-//const int pdFREERTOS_ERRNO_ENXIO = 6	/* No such device or address */;
-//const int pdFREERTOS_ERRNO_EBADF = 9	/* Bad file number */;
-//const int pdFREERTOS_ERRNO_EAGAIN = 11	/* No more processes */;
-//const int pdFREERTOS_ERRNO_EWOULDBLOCK = 11	/* Operation would block */;
-//const int pdFREERTOS_ERRNO_ENOMEM = 12	/* Not enough memory */;
-//const int pdFREERTOS_ERRNO_EACCES = 13	/* Permission denied */;
-//const int pdFREERTOS_ERRNO_EFAULT = 14	/* Bad address */;
-//const int pdFREERTOS_ERRNO_EBUSY = 16	/* Mount device busy */;
-//const int pdFREERTOS_ERRNO_EEXIST = 17	/* File exists */;
-//const int pdFREERTOS_ERRNO_EXDEV = 18	/* Cross-device link */;
-//const int pdFREERTOS_ERRNO_ENODEV = 19	/* No such device */;
-//const int pdFREERTOS_ERRNO_ENOTDIR = 20	/* Not a directory */;
-//const int pdFREERTOS_ERRNO_EISDIR = 21	/* Is a directory */;
-//const int pdFREERTOS_ERRNO_EINVAL = 22	/* Invalid argument */;
-//const int pdFREERTOS_ERRNO_ENOSPC = 28	/* No space left on device */;
-//const int pdFREERTOS_ERRNO_ESPIPE = 29	/* Illegal seek */;
-//const int pdFREERTOS_ERRNO_EROFS = 30	/* Read only file system */;
-//const int pdFREERTOS_ERRNO_EUNATCH = 42	/* Protocol driver not attached */;
-//const int pdFREERTOS_ERRNO_EBADE = 50	/* Invalid exchange */;
-//const int pdFREERTOS_ERRNO_EFTYPE = 79	/* Inappropriate file type or format */;
-//const int pdFREERTOS_ERRNO_ENMFILE = 89	/* No more files */;
-//const int pdFREERTOS_ERRNO_ENOTEMPTY = 90	/* Directory not empty */;
-//const int pdFREERTOS_ERRNO_ENAMETOOLONG = 91	/* File or path name too long */;
-//const int pdFREERTOS_ERRNO_EOPNOTSUPP = 95	/* Operation not supported on transport endpoint */;
-//const int pdFREERTOS_ERRNO_ENOBUFS = 105	/* No buffer space available */;
-//const int pdFREERTOS_ERRNO_ENOPROTOOPT = 109	/* Protocol not available */;
-//const int pdFREERTOS_ERRNO_EADDRINUSE = 112	/* Address already in use */;
-//const int pdFREERTOS_ERRNO_ETIMEDOUT = 116	/* Connection timed out */;
-//const int pdFREERTOS_ERRNO_EINPROGRESS = 119	/* Connection already in progress */;
-//const int pdFREERTOS_ERRNO_EALREADY = 120	/* Socket already connected */;
-//const int pdFREERTOS_ERRNO_EADDRNOTAVAIL = 125	/* Address not available */;
-//const int pdFREERTOS_ERRNO_EISCONN = 127	/* Socket is already connected */;
-//const int pdFREERTOS_ERRNO_ENOTCONN = 128	/* Socket is not connected */;
-//const int pdFREERTOS_ERRNO_ENOMEDIUM = 135	/* No medium inserted */;
-//const int pdFREERTOS_ERRNO_EILSEQ = 138	/* An invalid UTF-16 sequence was encountered. */;
-//const int pdFREERTOS_ERRNO_ECANCELED = 140	/* Operation canceled. */;
 
 /* The following endian values are used by FreeRTOS+ components, not FreeRTOS
 itself. */

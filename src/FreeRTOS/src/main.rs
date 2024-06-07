@@ -4,6 +4,7 @@
 
 mod bindings;
 mod uart;
+mod projdefs;
 mod FreeRTOS_tick_config;
 
 use core;
