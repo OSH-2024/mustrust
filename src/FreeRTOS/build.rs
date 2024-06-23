@@ -25,4 +25,6 @@ fn main() {
         .target("aarch64-none-elf")
         .compile("wrapper");
         // println!("cargo:rustc-link-search=wrapper");
+        println!("cargo:rustc-link-arg-bins=-T");
+        println!("cargo:rustc-link-arg-bins=raspberrypi3.ld");
 }
