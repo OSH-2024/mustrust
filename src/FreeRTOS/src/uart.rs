@@ -56,7 +56,7 @@ pub fn uart_read_bytes(buf: &mut [u8], length: u32) -> u32 {
     let num: u32 = unsafe { bindings::uxQueueMessagesWaiting((*uartctl).rx_queue) } as u32;
     let mut i: u32 = 0;
 
-    while i < num && i < length {
+    while i < num || i < length {
         unsafe {
             bindings::xQueueReceive((*uartctl).rx_queue, *(&mut buf[i as usize]) as *mut cty::c_void, crate::portMAX_DELAY!());
         }
