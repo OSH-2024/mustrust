@@ -1,5 +1,6 @@
 use core::arch::asm;
 use core::ptr::*;
+use core::intrinsics::*;
 use crate::bindings;
 
 /* Defines */
@@ -24,8 +25,8 @@ static mut uartctl: *mut UARTCTL = 0 as *mut UARTCTL;
 pub fn uart_putchar(c: u8) {
     unsafe {
         bindings::xSemaphoreTake((*uartctl).tx_mux, crate::portMAX_DELAY!());
-        while (read_volatile(AUX_MU_LSR) & 0x20) == 0 {}
-        write_volatile(AUX_MU_IO, c as u32);
+        while (unaligned_volatile_load(AUX_MU_LSR as *const u32) & 0x20) == 0 {}
+        unaligned_volatile_store(AUX_MU_IO, c as u32);
         bindings::xSemaphoreGive((*uartctl).tx_mux);
     }
 }
@@ -33,8 +34,8 @@ pub fn uart_putchar(c: u8) {
 pub fn uart_putchar_isr(c: u8) {
     unsafe {
         bindings::xSemaphoreTakeFromISR((*uartctl).tx_mux, core::ptr::null_mut());
-        while (read_volatile(AUX_MU_LSR) & 0x20) == 0 {}
-        write_volatile(AUX_MU_IO, c as u32);
+        while (unaligned_volatile_load(AUX_MU_LSR) & 0x20) == 0 {}
+        unaligned_volatile_store(AUX_MU_IO, c as u32);
         bindings::xSemaphoreGiveFromISR((*uartctl).tx_mux, core::ptr::null_mut());
     }
 }
@@ -80,42 +81,42 @@ pub fn uart_isr_register(r#fn: unsafe extern "C" fn()) {
     unsafe {
         g_vector_table[29].r#fn = Some(r#fn);
 
-        write_volatile(AUX_ENABLES, 1);
-        write_volatile(AUX_MU_IIR, 6);
-        write_volatile(AUX_MU_IER, 1);
+        unaligned_volatile_store(AUX_ENABLES, 1);
+        unaligned_volatile_store(AUX_MU_IIR, 6);
+        unaligned_volatile_store(AUX_MU_IER, 1);
 
-        write_volatile(IRQ_ENABLE_1, 1 << 29);
+        volatile_store(IRQ_ENABLE_1, (1 << 29) as u32);
     }
 }
 
 pub unsafe extern "C" fn uart_isr() {
-    if read_volatile(AUX_MU_LSR) & 1 != 0 {
-        let c = read_volatile(AUX_MU_IO) as u8;
+    if unaligned_volatile_load(AUX_MU_LSR) & 1 != 0 {
+        let c = unaligned_volatile_load(AUX_MU_IO) as u8;
         bindings::xQueueSendToBackFromISR((*uartctl).rx_queue, *(&c) as *mut cty::c_void, core::ptr::null_mut());
     }
 }
 
 pub fn uart_init() {
     unsafe {
-        let mut r = read_volatile(GPFSEL1);
+        let mut r = unaligned_volatile_load(GPFSEL1);
         r &= !(7<<12|7<<15);
         r |= 2<<12|2<<15;
-        write_volatile(GPFSEL1, r);
+        unaligned_volatile_store(GPFSEL1, r);
 
         for _ in 0..150 {
             asm!("nop");
         }
 
-        write_volatile(GPPUDCLK0, (1<<14)|(1<<15));
+        unaligned_volatile_store(GPPUDCLK0, (1<<14)|(1<<15));
 
         for _ in 0..150 {
             asm!("nop");
         }
 
-        write_volatile(GPPUDCLK0, 0);
+        unaligned_volatile_store(GPPUDCLK0, 0);
 
-        write_volatile(AUX_MU_BAUD, 270);
-        write_volatile(AUX_MU_LCR, 3);
+        unaligned_volatile_store(AUX_MU_BAUD, 270);
+        unaligned_volatile_store(AUX_MU_LCR, 3);
 
         uartctl = bindings::pvPortMalloc(core::mem::size_of::<UARTCTL>() as usize) as *mut UARTCTL;
         (*uartctl).tx_mux = bindings::xSemaphoreCreateMutex();
@@ -143,12 +144,12 @@ pub fn handle_range(pending: u32, base: u32) {
 }
 
 pub unsafe extern "C" fn irq_handler() {
-    let basic = read_volatile(IRQ_BASIC_PENDING) & 0x00000300;
+    let basic = unaligned_volatile_load(IRQ_BASIC_PENDING) & 0x00000300;
 
     if basic & 0x100 != 0 {
-        handle_range(read_volatile(IRQ_PENDING_1), 0);
+        handle_range(unaligned_volatile_load(IRQ_PENDING_1), 0);
     }
     if basic & 0x200 != 0 {
-        handle_range(read_volatile(IRQ_PENDING_2), 32);
+        handle_range(unaligned_volatile_load(IRQ_PENDING_2), 32);
     }
 }

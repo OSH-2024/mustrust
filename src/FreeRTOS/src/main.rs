@@ -1,6 +1,7 @@
 #![no_std]
 #![no_main]
 #![feature(asm)]
+#![feature(core_intrinsics)]
 
 mod bindings;
 mod uart;
@@ -71,6 +72,7 @@ pub extern "C" fn _exit() -> ! {
     loop {}
 }
 
+#[no_mangle]
 #[panic_handler]
 fn panic(_info: &PanicInfo) -> ! {
     loop {}
