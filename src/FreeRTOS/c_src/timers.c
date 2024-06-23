@@ -1073,4 +1073,6 @@ functionality then ensure configUSE_TIMERS is set to 1 in FreeRTOSConfig.h. */
 #endif /* configUSE_TIMERS == 1 */
 
 
-
+BaseType_t xTimerStart(TimerHandle_t xTimer, const TickType_t xTicksToWait) {
+  return xTimerGenericCommand( ( xTimer ), tmrCOMMAND_START, ( xTaskGetTickCount() ), NULL, ( xTicksToWait ) );
+}

@@ -89,6 +89,8 @@ extern "C" {
 #endif
 
 #include "mpu_wrappers.h"
+#include <stddef.h>
+#include <stdint.h>
 
 /*
  * Setup the stack of a new task so it is ready to be placed under the

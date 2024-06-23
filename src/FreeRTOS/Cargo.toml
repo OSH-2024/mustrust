@@ -22,6 +22,3 @@ panic = "abort"
 [profile.release]
 panic = "abort"
 
-[target.aarch64-unknown-none]
-linker = "aarch64-none-elf-gcc"
-

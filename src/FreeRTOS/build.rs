@@ -2,16 +2,31 @@ extern crate cc;
 
 fn main() {
 	cc::Build::new()
-        .file("src/wrapper.c")
+        .file("c_src/list.c")
+        .file("c_src/queue.c")
+        .file("c_src/tasks.c")
+        .file("c_src/timers.c")
+        .file("c_src/wrapper.c")
+        .file("c_src/portable/GCC/ARM_CA53_64_RaspberryPi3/port.c")
+        .file("c_src/portable/GCC/ARM_CA53_64_RaspberryPi3/portASM.S")
+        .file("c_src/portable/MemMang/heap_1.c")
+        .file("c_src/FreeRTOS_asm_vector.S")
+        .file("c_src/startup.S")
         .compiler("aarch64-none-elf-gcc")
-        .flag("-I").flag("src")
-        .flag("-I").flag("src/include")
-        .flag("-I").flag("src/portable/GCC/ARM_CA53_64_RaspberryPi3")
+        .flag("-I").flag("c_src")
+        .flag("-I").flag("c_src/include")
+        .flag("-I").flag("c_src/portable/GCC/ARM_CA53_64_RaspberryPi3")
         .flag("-mcpu=cortex-a53")
         .flag("-fpic")
         .flag("-ffreestanding")
         .flag("-O2")
         .flag("-std=gnu11")
+        .flag("-T").flag("raspberrypi3.ld")
         .target("aarch64-none-elf")
-        .compile("libwrapper.a");
+        .compile("wrapper");
+        // println!("cargo:rustc-link-search=wrapper");
+        println!("cargo:rustc-link-arg-bins=-T");
+        println!("cargo:rustc-link-arg-bins=raspberrypi3.ld");
+        println!("cargo:rustc-link-arg-bins=-o");
+        println!("cargo:rustc-link-arg-bins=build/FreeRTOS.elf");
 }

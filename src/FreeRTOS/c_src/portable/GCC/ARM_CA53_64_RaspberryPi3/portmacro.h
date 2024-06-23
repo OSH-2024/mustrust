@@ -41,6 +41,8 @@
  * These settings should not be altered.
  *-----------------------------------------------------------
  */
+#include <stddef.h>
+#include <stdint.h>
 
 /* Type definitions. */
 #define portCHAR		char
@@ -56,7 +58,7 @@ typedef portBASE_TYPE BaseType_t;
 typedef uint64_t UBaseType_t;
 
 typedef uint64_t TickType_t;
-#define portMAX_DELAY ( ( TickType_t ) 0xffffffffffffffff )
+#define portMAX_DELAY (( TickType_t ) 0xffffffffffffffff)
 
 /*-----------------------------------------------------------*/
 
