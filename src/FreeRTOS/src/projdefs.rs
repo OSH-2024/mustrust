@@ -1,5 +1,4 @@
 
-
 //const int pdFALSE = 0;
 //const int pdTRUE = 1;
 #[macro_export]
@@ -133,3 +132,9 @@ macro_rules! portMAX_DELAY { () => { 0xffffffffffffffff as u64 } }
 
 #[macro_export]
 macro_rules! tskIDLE_PRIORITY { () => { 0 } }
+
+#[macro_export]
+macro_rules! portTICK_PERIOD_MS { () => { (1000 / configTICK_RATE_HZ!()) as u64 } }
+
+#[macro_export]
+macro_rules! portTICK_RATE_MS { () => { portTICK_PERIOD_MS!() } }

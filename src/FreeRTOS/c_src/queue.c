@@ -2899,10 +2899,20 @@ BaseType_t xReturn;
 
 
 
+#if( configSUPPORT_DYNAMIC_ALLOCATION == 1 )
+	QueueHandle_t xQueueCreate( const UBaseType_t uxQueueLength, const UBaseType_t uxItemSize ) {
+		return xQueueGenericCreate( ( uxQueueLength ), ( uxItemSize ), ( queueQUEUE_TYPE_BASE ) );
+	}
+#endif
 
 
-
-
+ BaseType_t xQueueSendToBackFromISR(
+										 QueueHandle_t xQueue,
+										 const void *pvItemToQueue,
+										 BaseType_t *pxHigherPriorityTaskWoken
+									  ) {
+		return xQueueGenericSendFromISR( xQueue, pvItemToQueue, pxHigherPriorityTaskWoken, queueSEND_TO_BACK );
+									  }
 
 
 

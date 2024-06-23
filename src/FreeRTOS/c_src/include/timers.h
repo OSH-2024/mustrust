@@ -1263,9 +1263,7 @@ BaseType_t xTimerGenericCommand( TimerHandle_t xTimer, const BaseType_t xCommand
  *
  */
 
-BaseType_t xTimerStart(TimerHandle_t xTimer, const TickType_t xTicksToWait) {
-  return xTimerGenericCommand( ( xTimer ), tmrCOMMAND_START, ( xTaskGetTickCount() ), NULL, ( xTicksToWait ) );
-}
+BaseType_t xTimerStart(TimerHandle_t xTimer, const TickType_t xTicksToWait);
 
 
 #if( configUSE_TRACE_FACILITY == 1 )

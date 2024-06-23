@@ -27,4 +27,6 @@ fn main() {
         // println!("cargo:rustc-link-search=wrapper");
         println!("cargo:rustc-link-arg-bins=-T");
         println!("cargo:rustc-link-arg-bins=raspberrypi3.ld");
+        println!("cargo:rustc-link-arg-bins=-o");
+        println!("cargo:rustc-link-arg-bins=build/FreeRTOS.elf");
 }

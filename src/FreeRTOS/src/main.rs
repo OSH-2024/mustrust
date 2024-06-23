@@ -26,7 +26,7 @@ pub extern "C" fn TaskA(pvParameters: *mut cty::c_void) {
         loop {
             uart_puthex(bindings::xTaskGetTickCount());
             uart_putchar(b'\n');
-            bindings::vTaskDelay((500 / bindings::portTICK_RATE_MS) as u64);
+            bindings::vTaskDelay((500 / portTICK_RATE_MS!()) as u64);
         }
     }
 }
@@ -57,7 +57,7 @@ pub extern "C" fn main() -> ! {
         uart_puts("qemu exit: Ctrl-A x / qemu monitor: Ctrl-A c\n");
         uart_puts("hello world\n");
         bindings::xTaskCreate(Some(TaskA), task_name, 512, 0 as *mut cty::c_void, bindings::tskIDLE_PRIORITY as u64, &mut task_a);
-        timer = bindings::xTimerCreate(timer_name, (10 / bindings::portTICK_RATE_MS) as u64, bindings::pdTRUE as u64, 0 as *mut cty::c_void, Some(interval_func));
+        timer = bindings::xTimerCreate(timer_name, (10 / portTICK_RATE_MS!()) as u64, bindings::pdTRUE as u64, 0 as *mut cty::c_void, Some(interval_func));
         if timer != (0 as *mut cty::c_void) {
             bindings::xTimerStart(timer, 0);
         }
