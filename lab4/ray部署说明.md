@@ -51,7 +51,7 @@ windows11 + WSL2
    ```
    你应该会看到Docker的版本信息，这表示Docker已经成功安装并运行。
 5. **Docker换源**：在Docker Desktop图形界面下，换源比较简单。只要在`Setting`的`Docker Engine`选项下直接编辑json文件即可换源，这里使用科大源`https://docker.mirrors.ustc.edu.cn/`
-![alt text](25c018bf99946fe7f32645df4a19d183.png)
+![alt text](src/25c018bf99946fe7f32645df4a19d183.png)
 
 #### 部署Ray
 Ray的下载安装有多种方式，这里主要介绍通过拉取Docker镜像的方式，并列出其他几种常见方法，更多详细内容可以参考官网: [Ray安装指南](https://docs.ray.io/en/latest/ray-overview/installation.html#building-ray-from-source)。
@@ -65,8 +65,8 @@ Ray的下载安装有多种方式，这里主要介绍通过拉取Docker镜像�
 
 1. 安装Docker Desktop，确保Docker正常运行。
 2. 拉取Ray镜像，命令为：`docker pull rayproject/ray`（可用`docker images`或在Docker Desktop的`Images`选项中查看当前所有镜像，以确认Ray镜像是否成功引入）。
-![alt text](image.png)
-![alt text](c4a0b46b99d024dad6e8407546b0da41.png)
+![alt text](src/image.png)
+![alt text](src/c4a0b46b99d024dad6e8407546b0da41.png)
 
 #### 基于镜像创建并运行容器：
 
