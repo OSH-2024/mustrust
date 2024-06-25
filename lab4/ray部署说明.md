@@ -59,9 +59,9 @@ windows11 + WSL2
 ![alt text](src/25c018bf99946fe7f32645df4a19d183.png)
 
 ### 部署Ray
-Ray的下载安装有多种方式，这里主要介绍通过拉取Docker镜像的方式，并列出其他几种常见方法，更多详细内容可以参考官网: [Ray安装指南](https://docs.ray.io/en/latest/ray-overview/installation.html#building-ray-from-source)。
+Ray的下载安装有多种方式，这里主要介绍通过**拉取Docker镜像**的方式，并列出其他几种常见方法，更多详细内容可以参考官网: [Ray安装指南](https://docs.ray.io/en/latest/ray-overview/installation.html#building-ray-from-source)。
 
-### 从Docker Hub中拉取镜像
+#### 从Docker Hub中拉取镜像
 我们将从Docker Hub中拉取`rayproject/ray`镜像，该镜像已经打包部署了Ray及其运行环境，包括Linux系统、Python、Anaconda及所需的Python库等。（Ray Docker镜像地址为：[Docker Hub Ray镜像](https://hub.docker.com/r/rayproject/ray)）
 
 **注意**：目前测试未发现测试过程中Python版本对结果有显著影响，但在issue中发现Python 3.6存在一些bug，建议使用3.7及以上版本。
@@ -108,7 +108,7 @@ docker run --shm-size=4G -t -i -p 8265:8265 -p 3000:3000 -p 9000:9000 -p 6379:63
 
 当然，这些功能在Docker Desktop里面都有对应的图形化实现，可以自行探索。
 
-### 附1：直接安装Ray包
+#### 附1：直接安装Ray包
 通过Pypi下载，可以直接将Ray作为一个Python包来安装（`ray[default]`为默认部分，可选择`ray[air]`加入Ray的AI支持项）：
 ```shell
 # 安装Ray并支持dashboard和集群启动
@@ -117,7 +117,7 @@ pip install -U "ray[default]"
 pip install -U "ray[air]"
 ```
 
-### 附2：从源码安装Ray
+#### 附2：从源码安装Ray
 拉取Ray的GitHub仓库源码：
 ```shell
 git clone git@github.com:ray-project/ray.git
@@ -168,12 +168,11 @@ wget https://dl.grafana.com/enterprise/release/grafana-enterprise-9.5.2.linux-am
 tar -xzvf grafana-enterprise-9.5.2.linux-amd64.tar.gz
 ```
 
-### 运行Ray
+### 单机运行Ray
 
-#### 单机运行
 在之前的步骤中，我们已经完成了Ray的安装和部署，现在我们将启动Ray。
 
-#### 启动各项服务
+#### 启动Ray
 首先，在命令行中输入以下命令来启动Ray：
 
 ```shell
@@ -206,3 +205,95 @@ ray start --head --port=6379 --dashboard-host=0.0.0.0
 此时，Prometheus和Grafana的服务也已经启动。我们可以在浏览器中输入`127.0.0.1:8265`来查看Ray的dashboard。
 
 ![alt text](src/image3.png)
+
+#### 运行测试程序
+
+新建一个测试程序test.py，测试Ray是否正常运行
+
+```python
+import ray
+
+ray.init(dashboard_host="0.0.0.0")
+
+# Define the square task.
+@ray.remote
+def square(x):
+    return x * x
+
+# Launch four parallel square tasks.
+futures = [square.remote(i) for i in range(4)]
+
+# Retrieve results.
+print(ray.get(futures))
+# -> [0, 1, 4, 9]
+```
+此时，如果你还没厘清Windows, WSL, Linux, Docker, Docker容器的区别，请你仔细阅读下面一段话。
+
+- Docker基于Linux系统运行，在我们的实验中，它使用的是Windows自带的WSL2（Windows Subsystem for Linux 2）。当我们在Windows上安装Docker Desktop时，实际上是为WSL2环境安装了Docker。Docker利用WSL2提供的Linux环境来创建Docker容器，而Docker Desktop则充当了Docker容器与Windows系统之间的桥梁。
+
+- 在本文中，我们拉取了一个Ray的Docker镜像，实际上是将一个预先配置好了Python和Ray的Linux子系统作为Docker容器启动。这个容器可以看作是一个轻量级的虚拟环境，其中已经包含了所需的Python环境和Ray框架，使得用户可以快速启动和运行Ray应用程序，而无需担心配置和依赖项的安装。
+
+如何将test.py放到容器中启动呢？Docker Desktop提供了非常简便的图形化方式，只要在容器的`file`选项中右击相应的文件夹，即可将你写在Windows系统上的文件方便地直接传入Docker容器中，跨过了WSL这一层。
+
+![alt text](src/8e68b2672d118295c3e7de967ff3e4cb.png)
+
+上传完毕后，在Docker容器中，进入文件所在目录，像在本地运行python代码一样输入
+``` shell
+python3 test.py
+```
+即可成功运行python程序。我们可以在命令行输出和dashboard中分别查看程序的运行情况，若运行正常，说明我们单机部署已经成功。
+
+![alt text](src/image4.png)
+
+可在命令行中用`ray stop`命令停止Ray服务
+
+并不是。Ray的分布式部署方式并不依赖于在同一台PC上创建多个Docker容器来模拟多台机器，而是通过在实际的多台机器上运行多个Ray节点来实现分布式部署。以下是简要的分布式部署过程：
+
+### 分布式部署Ray
+
+#### 1. 准备多台机器
+确保你有多台物理或虚拟的计算机，这些计算机可以在同一个局域网内通信。
+
+#### 2. 在每台机器上安装Docker和Ray
+在每台机器上按照之前的步骤安装Docker，并拉取Ray的Docker镜像。
+
+```shell
+# 在每台机器上运行
+docker pull rayproject/ray
+```
+
+#### 3. 启动主节点（Head Node）
+在其中一台机器上启动Ray的主节点：
+
+```shell
+ray start --head --port=6379 --dashboard-host=0.0.0.0
+```
+
+#### 4. 启动从节点（Worker Nodes）
+在其他机器上连接到主节点，启动Ray从节点：
+
+```shell
+ray start --address='主节点IP:6379'
+```
+其中，`主节点IP`是你在第3步中启动主节点的机器的IP地址。
+
+#### 5. 验证分布式部署
+使用`ray status`命令来检查集群状态，确保所有节点都已正确连接。
+
+```shell
+ray status
+```
+
+#### 6. 启动监控工具
+在主节点上启动Prometheus和Grafana，以便监控整个集群的性能。
+
+```shell
+# Prometheus
+./prometheus --config.file=/tmp/ray/session_latest/metrics/prometheus/prometheus.yml
+
+# Grafana
+./bin/grafana-server --config /tmp/ray/session_latest/metrics/grafana/grafana.ini web
+```
+
+#### 总结
+Ray的分布式部署是在实际的多台机器上运行多个Ray节点，通过网络连接实现分布式计算。每台机器上运行的Ray节点可以协同工作，形成一个统一的分布式计算集群。这样可以充分利用多台机器的计算资源，实现高效的分布式计算。
