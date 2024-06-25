@@ -2,6 +2,7 @@ include!("FreeRTOSConfig.rs");
 use cty;
 use core::arch::asm;
 use core::ptr::*;
+use core::intrinsics::*;
 
 use crate::bindings;
 use crate::uart;
@@ -56,7 +57,7 @@ pub fn vConfigureTickInterrupt() {
     unsafe {
         init_timer();
         timer_set_tick_rate_hz(configTICK_RATE_HZ!());
-        write_volatile(CORE0_TIMER_IRQCNTL, 8 as u32);
+        volatile_store(CORE0_TIMER_IRQCNTL, 8 as u32);
         enable_cntv();
     }
 }
