@@ -50,7 +50,12 @@ windows11 + WSL2
    docker --version
    ```
    你应该会看到Docker的版本信息，这表示Docker已经成功安装并运行。
-5. **Docker换源**：在Docker Desktop图形界面下，换源比较简单。只要在`Setting`的`Docker Engine`选项下直接编辑json文件即可换源，这里使用科大源`https://docker.mirrors.ustc.edu.cn/`
+5. **Docker换源**：在Docker Desktop图形界面下，换源比较简单。只要在`Setting`的`Docker Engine`选项下直接编辑json文件添加下面一行即可，注意上一行末尾加`,`这里使用科大源。
+    ```json
+    "registry-mirrors": [
+        "https://docker.mirrors.ustc.edu.cn/"
+    ]
+    ```
 ![alt text](src/25c018bf99946fe7f32645df4a19d183.png)
 
 ### 部署Ray
@@ -64,12 +69,13 @@ Ray的下载安装有多种方式，这里主要介绍通过拉取Docker镜像�
 #### 安装步骤：
 
 1. 安装Docker Desktop，确保Docker正常运行。
-2. 拉取Ray镜像，命令为：`docker pull rayproject/ray`（可用`docker images`或在Docker Desktop的`Images`选项中查看当前所有镜像，以确认Ray镜像是否成功引入）。
+2. 拉取Ray镜像，命令为：`docker pull rayproject/ray`（可用`docker images`或在Docker Desktop的`Images`选项中，查看当前所有镜像，以确认Ray镜像是否成功引入）。
 ![alt text](src/image.png)
 ![alt text](src/c4a0b46b99d024dad6e8407546b0da41.png)
 
 #### 基于镜像创建并运行容器：
 
+在powershell中输入以下命令：
 ```shell
 docker run --shm-size=4G -t -i -p 8265:8265 -p 3000:3000 -p 9000:9000 -p 6379:6379 rayproject/ray
 ```
@@ -80,6 +86,18 @@ docker run --shm-size=4G -t -i -p 8265:8265 -p 3000:3000 -p 9000:9000 -p 6379:63
 - `-t`: 终端。
 - `-p`: 端口映射，格式为主机端口:容器端口，可多次使用。8265端口为dashboard默认端口，3000端口为Grafana默认端口，9000端口为Prometheus默认端口，6379端口为Ray头结点连接（用于分布式部署）默认端口。
 
+此时，命令提示符从Windows盘符地址变成了容器的Shell提示符：
+```shell
+(base) ray@f01a2a6d0145:~$
+```
+这表明你已经进入了Docker容器的交互式终端环境，提示符的一部分内容会显示当前用户和主机名（容器ID的一部分），解释如下：
+- **(base)**： 这表明当前激活的是一个Conda环境，通常是base环境。
+- **ray**：这是你在容器内的用户名。
+- **f01a2a6d0145**： 这是容器的部分ID，用于标识容器。
+- **~$**： 这是容器内当前的工作目录，~代表用户的主目录。
+
+现在，你已经基于ray镜像成功地创建并运行了一个Docker容器，并已经针对我们未来要用到的数据可视化工具Prometheus与Grafana分配了端口。
+
 #### 后续操作：
 - 若要重新打开容器，用`docker start`命令，参数为容器ID或容器名：`docker start [OPTIONS] CONTAINER [CONTAINER...]`。
 - 可使用`docker commit`将修改后的容器提交为镜像的新版本，指令格式为：`docker commit [OPTIONS] CONTAINER [REPOSITORY[:TAG]]`，其中OPTIONS为可选项，CONTAINER为容器ID或容器名，REPOSITORY为新镜像的名字，TAG为新镜像的标签，若不指定则默认为latest。
@@ -87,6 +105,8 @@ docker run --shm-size=4G -t -i -p 8265:8265 -p 3000:3000 -p 9000:9000 -p 6379:63
   - 本地文件拷贝到容器：`docker cp <本地文件路径> <容器名或ID>:<docker目标路径>`
   - 容器文件拷贝到本地：`docker cp <容器名或ID>:<docker源路径> <本地文件路径>`
 - 可选：在VSCode中下载Docker插件，该插件提供部分图形化功能，特别是访问容器文件列表与编辑容器文件的功能，非常便捷。
+
+当然，这些功能在Docker Desktop里面都有对应的图形化实现，可以自行探索。
 
 ### 附1：直接安装Ray包
 通过Pypi下载，可以直接将Ray作为一个Python包来安装（`ray[default]`为默认部分，可选择`ray[air]`加入Ray的AI支持项）：
@@ -110,3 +130,79 @@ python -m pytest -v python/ray/tests/test_mini.py
 - 如果报`pytest`不存在，需要安装：`pip install pytest`。
 - 如果报`ERROR: file or directory not found: python/ray/tests/test_mini.py`，需要在Git仓库根目录下运行。
 - 如果报`ImportError: cannot import name 'find_available_port' from 'ray._private.test_utils'`，需要进入`python/ray/tests/conftest.py:28`，并将`find_available_port`注释掉，实测可以正常通过`PASS`。
+
+### 下载Prometheus与Grafana等配件
+
+在上一节中，你已经基于ray镜像成功地创建并运行了一个Docker容器，并已经针对我们未来要用到的数据可视化工具Prometheus与Grafana分配了端口。现在，让我们一起来下载这两个工具。
+
+#### Q：为什么要采用数据可视化工具Prometheus与Grafana？
+尽管Docker Dashboard已经提供了基本的可视化管理功能，但添加Prometheus和Grafana能够提供更强大和详细的数据可视化与监控功能，尤其在性能测试和优化过程中非常有用。以下是原因简要说明：
+
+1. **详细数据监控**：
+   - **Prometheus**：专注于实时数据收集和存储，特别适合监控系统和服务的性能指标。
+   - **Grafana**：提供强大的数据可视化功能，可以将Prometheus收集的数据以图表形式展示，便于分析和评估。
+
+2. **性能指标跟踪**：
+   - Prometheus和Grafana可以帮助追踪和展示多个性能指标，如延迟、IOPS等，便于进行细致的性能测试和分析。
+
+3. **历史数据和趋势分析**：
+   - 这些工具能存储历史数据，方便进行趋势分析和长期性能评估。
+
+4. **灵活性和可扩展性**：
+   - 允许定制和扩展监控项，满足实验需求的多样性和复杂性。
+
+通过这些工具，可以全面监控和优化Ray的性能，确保实验要求得到充分满足，且能清晰地展示优化效果。
+
+#### 下载步骤
+
+在容器的shell提示符中继续输入命令
+
+下载Prometheus的可执行文件，然后解压：
+```shell
+wget https://github.com/prometheus/prometheus/releases/download/v2.37.8/prometheus-2.37.8.linux-amd64.tar.gz
+tar -xzvf prometheus-*.tar.gz
+```
+下载Grafana的可执行文件，然后解压：
+```shell
+wget https://dl.grafana.com/enterprise/release/grafana-enterprise-9.5.2.linux-amd64.tar.gz
+tar -xzvf grafana-enterprise-9.5.2.linux-amd64.tar.gz
+```
+
+### 运行Ray
+
+#### 单机运行
+在之前的步骤中，我们已经完成了Ray的安装和部署，现在我们将启动Ray。
+
+#### 启动各项服务
+首先，在命令行中输入以下命令来启动Ray：
+
+```shell
+ray start --head --port=6379 --dashboard-host=0.0.0.0
+```
+
+**注意**：必须将`dashboard-host`设为`0.0.0.0`，这样才能在Docker外部的主机中访问dashboard。
+
+此时，Ray服务已经启动。
+
+#### 启动Prometheus和Grafana
+接下来，我们需要启动Prometheus和Grafana来进行数据监控和可视化。
+
+新开一个命令行终端（可以使用`docker exec`命令，也可以在Docker Desktop中按照下图操作）
+![alt text](src/image1.png)
+![alt text](src/image2.png)
+
+然后从当前目录，进入安装好的Prometheus目录（例如`prometheus-*.linux-amd64`），输入以下命令：
+
+```shell
+./prometheus --config.file=/tmp/ray/session_latest/metrics/prometheus/prometheus.yml
+```
+
+同样地，在安装好的Grafana目录下（例如`grafana-9.5.2`，版本号可能因情况而异），新开一个命令行终端（可以使用`docker exec`命令），然后输入以下命令：
+
+```shell
+./bin/grafana-server --config /tmp/ray/session_latest/metrics/grafana/grafana.ini web
+```
+
+此时，Prometheus和Grafana的服务也已经启动。我们可以在浏览器中输入`127.0.0.1:8265`来查看Ray的dashboard。
+
+![alt text](src/image3.png)
