@@ -317,6 +317,9 @@ impl List {
     }
 }
 
+pub fn vListInitialise(item: &mut ItemLink) {
+    let ItemLink = List::default();
+}
 
 // 将节点按照升序排列插入到链表
 pub fn vListInsert(list: &ListLink, item_link: &ItemLink) {
