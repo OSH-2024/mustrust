@@ -321,6 +321,10 @@ pub fn vListInitialise(item: &mut ItemLink) {
     let ItemLink = List::default();
 }
 
+pub fn vListInitialiseItem(item: &mut ListItem) {
+    let ListItem = ListItem::default();
+}
+
 // 将节点按照升序排列插入到链表
 pub fn vListInsert(list: &ListLink, item_link: &ItemLink) {
     item_link.write().unwrap().set_container(&list);
