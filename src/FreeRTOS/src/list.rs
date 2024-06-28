@@ -394,11 +394,11 @@ pub fn is_contained_within(list: &ListLink, item_link: &ItemLink) -> bool {
     }
 }
 
-pub fn vListInitialise(item: &mut ItemLink) {
+pub fn list_initialise(item: &mut ItemLink) {
     let ItemLink = xLIST::default();
 }
 
-pub fn vListInitialiseItem(item: &mut ListItem) {
+pub fn list_initialiseItem(item: &mut ListItem) {
     let ListItem = xLIST_ITEM::default();
 }
 
@@ -406,7 +406,7 @@ pub fn vListInitialiseItem(item: &mut ListItem) {
 // why not use &ItemLink
 /// list_insert
 /// 将节点按照升序排列插入到链表
-pub fn vListInsert(list: &ListLink, item_link: &ItemLink) {
+pub fn list_insert(list: &ListLink, item_link: &ItemLink) {
     /* Remember which list the item is in.  This allows fast removal of the
     item later. */
     item_link.write().unwrap().set_container(&list);
@@ -417,7 +417,7 @@ pub fn vListInsert(list: &ListLink, item_link: &ItemLink) {
 // why not use &ItemLink
 /// list_insert_end
 /// insert before pxIndex
-pub fn vListInsertEnd(list: &ListLink, item_link: &ItemLink) {
+pub fn list_insert_end(list: &ListLink, item_link: &ItemLink) {
     /* Insert a new list item into pxList, but rather than sort the list,
     makes the new list item the last item to be removed by a call to
     listGET_OWNER_OF_NEXT_ENTRY(). */
@@ -431,7 +431,7 @@ pub fn vListInsertEnd(list: &ListLink, item_link: &ItemLink) {
 // why not use &ItemLink
 /// list_remove
 /// 传回剩余节点数
-pub fn uxListRemove(item_link: ItemLink) -> UBaseType_t {
+pub fn list_remove(item_link: ItemLink) -> UBaseType_t {
     item_link
         .write()
         .unwrap()
