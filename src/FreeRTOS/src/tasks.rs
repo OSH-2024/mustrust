@@ -1,4 +1,9 @@
 use crate::list::*;
+use alloc::sync::{Arc, Weak};
+use core::ops::FnOnce;
+use core::mem;
+use crate::port;
+use no_std_async::rwlock::RwLock;
 
 #[cfg(configUSE_PREEMPTION!() = 0)]
 macro_rules! taskYIELD_IF_USING_PREEMPTION { () => { } }
@@ -176,4 +181,109 @@ impl task_control_block {
         }
         self
     }
+
+    pub fn get_base_priority(&self) -> UBaseType_t {
+        self.base_priority
+    }
+
+    pub fn set_base_priority(mut self, priority: UBaseType_t) -> Self {
+        if priority > configMAX_PRIORITIES!() {
+            // Warning: Priority exceeded
+            self.base_priority = configMAX_PRIORITIES!() - 1;
+        }
+        else {
+            self.base_priority = priority;
+        }
+        self
+    }
+
+    pub fn get_stack_list_item(&self) -> ListItem {
+        self.state_list_item.clone()
+    }
+
+    pub fn get_event_list_item(&self) -> ListItem {
+        self.event_list_item.clone()
+    }
+
+    #[cfg(feature = "configGENERATE_RUN_TIME_STATS")]
+    pub fn get_runtime(&self) -> TickType_t {
+        self.runtime_counter
+    }
+
+    #[cfg(feature = "configGENERATE_RUN_TIME_STATS")]
+    pub fn set_runtime(&mut self, next_val: TickType_t) -> TickType_t {
+        let prev_val = self.runtime_counter;
+        self.runtime_counter = next_val
+        prev_val
+    }
+
+    #[cfg(feature = "INCLUDE_xTaskAbortDelay")]
+    pub fn get_delay_aborted(&self) -> bool {
+        self.delay_aborted
+    }
+
+    #[cfg(feature = "INCLUDE_xTaskAbortDelay")]
+    pub fn set_delay_aborted(&mut self, next_val: bool) -> bool {
+        let prev_val = self.delay_aborted;
+        self.delay_aborted = next_val;
+        prev_val
+    }
+
+    #[cfg(feature = "configUSE_MUTEXES")]
+    pub fn get_mutex_held_count(&self) -> UBaseType_t {
+        self.mutexed_held
+    }
+
+    #[cfg(feature = "configUSE_MUTEXES")]
+    pub fn set_mutex_held_count(&mut self, new_count: UBaseType_t) {
+        self.mutexed_held = new_count;
+    }
+
+    pub fn initialize<F>(mut self, func: F) -> Result<TaskHandle, FreeRtosError>
+    where
+        F: FnOnce() -> () + Send + 'static,
+    {
+        let size_of_stacktype = core::mem::size_of::<StackType>();
+        let stacksize_as_bytes = size_of_stacktype * self.stack_length as usize;
+        // Initialize stack
+        let px_stack = port::port_malloc(stacksize_as_bytes)?;
+        self.stack = px_stack as *mut StackType;
+        let mut top_of_stack = self.stack + self.stack_length - 1;
+        top_of_stack = top_of_stack & portBYTE_ALIGNMENT_MASK as *mut StackType;
+        // Initialize task
+        let f = Box::new(Box::new(func) as Box<dyn FnOnce()>);
+        let param_ptr = &*f as *const _ as *mut _;
+        let result = port::port_initialise_stack(top_of_stack as *mut _, 32, param_ptr);
+        match result {
+            Ok(_) => core::mem::forget(f),
+            Err(e) => return Err(e),
+        }
+
+        #[cfg(feature = "configUSE_MUTEXES")]
+        {
+            self.mutexed_held = 0;
+            self.base_priority = self.priority;
+        }
+
+        #[cfg(feature = "portCRITICAL_NESTING_IN_TCB")]
+        {
+            self.critical_nesting = 0;
+        }
+
+        #[cfg(feature = "configGENERATE_RUN_TIME_STATS")]
+        {
+            self.runtime_counter = 0;
+        }
+        
+        let stack_ptr = self.stack;
+        let handle = TaskHandle(Arc::new(RwLock::new(self)));
+        list::set_list_item_owner(&handle.GetStateListItem(), handle.clone());
+        list::set_list_item_owner(&handle.GetEventListItem(), handle.clone());
+        list::set_list_item_owner(&handle.GetStackListItem(), handle.clone());
+        let item_value = (configMAX_PRIORITIES!() - handle.GetPriority()) as TickType;
+        list::listSET_LIST_ITEM_VALUE(&handle.GetStackListItem(), item_value);
+        Ok(handle)
+    }
 }
+
+
