@@ -75,21 +75,6 @@ macro_rules! taskRESET_READY_PRIORITY {
     ($uxPriority: expr) => {};
 }
 
-/* pxDelayedTaskList and pxOverflowDelayedTaskList are switched when the tick
-count overflows. */
-#[macro_export]
-macro_rules! taskSWITCH_DELAYED_LISTS {
-    () => {
-        unsafe {
-            let mut delayed_task_list = pxDelayedTaskList.write().unwrap();
-            let mut overflowedTaskList = pxOverflowDelayedTaskList.write().unwrap();
-            let temp = (*delayedTaskList).clone();
-            *delayedTaskList = (*overflowedTaskList).clone();
-            *overflowedTaskList = temp;
-        }
-    };
-}
-
 #[cfg(feature = "configUSE_16_BIT_TICKS")]
 #[macro_export]
 macro_rules! taskEVENT_LIST_ITEM_VALUE_IN_USE { () => { 0x8000 as u16 } }
