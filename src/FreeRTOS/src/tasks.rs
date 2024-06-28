@@ -302,3 +302,24 @@ pub fn record_ready_priority(priority: UBaseType_t) {
         set_top_ready_priority!(priority);
     }
 }
+
+#[macro_export]
+macro_rules! GetTaskControlBlockRead {
+    ($handle: expr) => {
+        match $handle.0.try_read() {
+            Ok(x) => x,
+            Err(_) => panic!("Task handle locked"),
+        }
+    }
+}
+
+#[macro_export]
+macro_rules! GetTaskControlBlockWrite {
+    ($handle: expr) => {
+        match $handle.0.try_write() {
+            Ok(x) => x,
+            Err(_) => panic!("Task handle locked"),
+        }
+    }
+}
+
