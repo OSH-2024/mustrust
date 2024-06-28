@@ -4,9 +4,11 @@
 #![feature(core_intrinsics)]
 
 mod bindings;
-mod uart;
-mod projdefs;
 mod FreeRTOS_tick_config;
+mod port;
+mod projdefs;
+mod tasks;
+mod uart;
 
 use core;
 use core::arch::asm;
