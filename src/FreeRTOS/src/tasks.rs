@@ -97,7 +97,7 @@ macro_rules! taskEVENT_LIST_ITEM_VALUE_IN_USE { () => { 0x8000 as u16 } }
 #[macro_export]
 macro_rules! taskEVENT_LIST_ITEM_VALUE_IN_USE { () => { 0x80000000 as u32 } }
 
-pub struct task_control_block {
+pub struct TaskControlBlock {
     state_list_item: ListItem,
     event_list_item: ListItem,
     priority: UBaseType_t,
@@ -121,13 +121,13 @@ pub struct task_control_block {
     delay_aborted: bool,
 }
 
-impl PartialEq for task_control_block {
+impl PartialEq for TaskControlBlock {
     fn eq(&self, other: &Self) -> bool {
         self.stack == other.stack
     }
 }
 
-impl task_control_block {
+impl TaskControlBlock {
     pub fn new() -> Self {
         Self {
             state_list_item: ListItem::default(),
@@ -286,4 +286,34 @@ impl task_control_block {
     }
 }
 
+#[derive(Clone)]
+pub struct TaskHandle(Arc<RwLock<TaskControlBlock>>);
 
+impl PartialEq for TaskHandle {
+    fn eq(&self, other: &Self) -> bool {
+        *self.0.read().unwrap() == *other.0.read().unwrap()
+    }
+}
+
+impl From<Weak<RwLock<TaskControlBlock>>> for TaskHandle {
+    fn from(weak_link: Weak<RwLock<TaskControlBlock>>) -> Self {
+        TaskHandle(
+            weak_link
+                .upgrade()
+                .unwrap_or_else(|| panic!("Owner is not set")),
+        )
+    }
+}
+
+impl From<TaskHandle> for Weak<RwLock<TaskControlBlock>> {
+    fn from(task: TaskHandle) -> Self {
+        Arc::downgrade(&task.0)
+    }
+}
+
+#[macro_use]
+pub fn record_ready_priority(priority: UBaseType_t) {
+    if priority > get_top_ready_priority!() {
+        set_top_ready_priority!(priority);
+    }
+}
