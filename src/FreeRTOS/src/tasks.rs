@@ -512,3 +512,72 @@ impl TaskHandle {
         Ok(())
     }
 }
+
+pub fn add_current_task_to_delayed_list(ticks_to_delay: TickType, can_block_indefinitely: bool) {
+    let current_task_handle = get_current_task_handle!();
+    {
+        #![cfg(feature = "INCLUDE_xTaskAbortDelay")]
+        current_task_handle.set_delay_aborted(false);
+    }
+
+    if list::list_remove(current_task_handle.get_event_list_item()) == 0 {
+        // Removed from ready list
+        // Reset the highest priority of the ready list
+        portRESET_READY_PRIORITY!(current_task_handle.get_priority(), get_top_ready_priority!());
+    }
+    else {
+        // Error
+    }
+
+    {
+        // INCLUDE_vTaskSuspend is defined
+        #![cfg(feature = "INCLUDE_vTaskSuspend")]
+        if ticks_to_delay == port::portMAX_DELAY && can_block_indefinitely {
+            // Add the task to suspend list instead of delayed list
+            let current_state_list_item = current_task_handle.get_state_list_item();
+            list::list_insert_end(&SUSPENDED_TASK_LIST, &current_state_list_item);
+        }
+        else {
+            // Calculate when the task will be resumed and insert into delayed list
+            let time = get_tick_count!() + ticks_to_delay;
+            let current_state_list_item = current_task_handle.get_state_list_item();
+            list::listSET_LIST_ITEM_VALUE(&current_state_list_item, time);
+
+            if time < get_tick_count!() {
+                // Add the task to overflow delayed list
+                list::vListInsert(&OVERFLOW_DELAYED_TASK_LIST, &current_state_list_item);
+            }
+            else {
+                // Add the task to delayed list
+                list::vListInsert(&DELAYED_TASK_LIST, &current_state_list_item);
+
+                // Next task unblock time should be updated
+                if time < get_next_unblock_time!() {
+                    set_next_unblock_time!(time);
+                }
+            }
+        }
+    }
+
+    {
+        // INCLUDE_vTaskSuspend is not defined
+        #![cfg(not(feature = "INCLUDE_vTaskSuspend"))]
+        let time = get_tick_count!() + ticks_to_delay;
+        let current_state_list_item = current_task_handle.get_state_list_item();
+        list::listSET_LIST_ITEM_VALUE(&current_state_list_item, time);
+
+        if time < get_tick_count!() {
+            // Add the task to overflow delayed list
+            list::vListInsert(&OVERFLOW_DELAYED_TASK_LIST, &current_state_list_item);
+        }
+        else {
+            // Add the task to delayed list
+            list::vListInsert(&DELAYED_TASK_LIST, &current_state_list_item);
+
+            // Next task unblock time should be updated
+            if time < get_next_unblock_time!() {
+                set_next_unblock_time!(time);
+            }
+        }
+    }
+}

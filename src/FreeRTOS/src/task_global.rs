@@ -304,14 +304,14 @@ macro_rules! get_task_switched_in_time {
 #[macro_export]
 macro_rules! get_current_task_handle_wrapped {
     () => {
-        crate::global::CURRENT_TCB.read().unwrap().as_ref()
+        crate::task_global::CURRENT_TCB.read().unwrap().as_ref()
     };
 }
 
 #[macro_export]
 macro_rules! get_current_task_handle {
     () => {
-        crate::global::CURRENT_TCB.read().unwrap().as_ref().unwrap().clone()
+        crate::task_global::CURRENT_TCB.read().unwrap().as_ref().unwrap().clone()
     };
 }
 
@@ -319,7 +319,7 @@ macro_rules! get_current_task_handle {
 macro_rules! set_current_task_handle {
     ($cloned_new_task: expr) => {
         // info!("CURRENT_TCB changed!");
-        *(crate::global::CURRENT_TCB).write().unwrap() = Some($cloned_new_task)
+        *(crate::task_global::CURRENT_TCB).write().unwrap() = Some($cloned_new_task)
     };
 }
 
