@@ -15,6 +15,9 @@ macro_rules! taskYIELD_IF_USING_PREEMPTION { () => { } }
 macro_rules! taskYIELD_IF_USING_PREEMPTION { () => { portYIELD_WITHIN_API!() } }
 
 #[macro_export]
+macro_rules! taskENTER_CRITICAL { () => { portENTER_CRITICAL!() } }
+
+#[macro_export]
 macro_rules! taskNOT_WAITING_NOTIFICATION { () => { 0 as u8 } }
 #[macro_export]
 macro_rules! taskWAITING_NOTIFICATION { () => { 1 as u8 } }
@@ -58,7 +61,7 @@ macro_rules! taskRECORD_READY_PRIORITY {
 
 #[cfg(not(feature = "configUSE_PORT_OPTIMISED_TASK_SELECTION"))]
 fn taskSelectHighestPriorityTask() {
-    let mut uxTopPriority: UBaseType_t = uxTopReadyPriority;
+    let mut uxTopPriority: UBaseType = uxTopReadyPriority;
 
     /* Find the highest priority queue that contains ready tasks. */
     while list::list_is_empty(&READY_TASK_LISTS[uxTopPriority as usize]) {
@@ -88,17 +91,17 @@ macro_rules! taskEVENT_LIST_ITEM_VALUE_IN_USE { () => { 0x80000000 as u32 } }
 pub struct TaskControlBlock {
     state_list_item: ListItem,
     event_list_item: ListItem,
-    priority: UBaseType_t,
+    priority: UBaseType,
     task_name: String
     stack: StackType_t,
-    stack_length: UBaseType_t,
+    stack_length: UBaseType,
 
     #[cfg(feature = "portCRITICAL_NESTING_IN_TCB")]
-    critical_nesting: UBaseType_t,
+    critical_nesting: UBaseType,
     #[cfg(feature = "configUSE_MUTEXES")]
-    base_priority: UBaseType_t,
+    base_priority: UBaseType,
     #[cfg(feature = "configUSE_MUTEXES")]
-    mutexed_held: UBaseType_t,
+    mutexed_held: UBaseType,
     #[cfg(feature = "configGENERATE_RUN_TIME_STATS")]
     runtime_counter: TickType_t,
     #[cfg(feature = "configUSE_TASK_NOTIFICATIONS")]
@@ -150,16 +153,16 @@ impl TaskControlBlock {
         self
     }
 
-    pub fn set_stack_length(&mut self, length: UBaseType_t) -> Self {
+    pub fn set_stack_length(&mut self, length: UBaseType) -> Self {
         self.stack_length = length;
         self
     }
 
-    pub fn get_priority(&self) -> UBaseType_t {
+    pub fn get_priority(&self) -> UBaseType {
         self.priority.clone()
     }
 
-    pub fn set_priority(mut self, priority: UBaseType_t) -> Self {
+    pub fn set_priority(mut self, priority: UBaseType) -> Self {
         if priority > configMAX_PRIORITIES!() {
             // Warning: Priority exceeded
             self.priority = configMAX_PRIORITIES!() - 1;
@@ -170,11 +173,11 @@ impl TaskControlBlock {
         self
     }
 
-    pub fn get_base_priority(&self) -> UBaseType_t {
+    pub fn get_base_priority(&self) -> UBaseType {
         self.base_priority
     }
 
-    pub fn set_base_priority(mut self, priority: UBaseType_t) -> Self {
+    pub fn set_base_priority(mut self, priority: UBaseType) -> Self {
         if priority > configMAX_PRIORITIES!() {
             // Warning: Priority exceeded
             self.base_priority = configMAX_PRIORITIES!() - 1;
@@ -218,12 +221,12 @@ impl TaskControlBlock {
     }
 
     #[cfg(feature = "configUSE_MUTEXES")]
-    pub fn get_mutex_held_count(&self) -> UBaseType_t {
+    pub fn get_mutex_held_count(&self) -> UBaseType {
         self.mutexed_held
     }
 
     #[cfg(feature = "configUSE_MUTEXES")]
-    pub fn set_mutex_held_count(&mut self, new_count: UBaseType_t) {
+    pub fn set_mutex_held_count(&mut self, new_count: UBaseType) {
         self.mutexed_held = new_count;
     }
 
@@ -300,7 +303,7 @@ impl From<TaskHandle> for Weak<RwLock<TaskControlBlock>> {
 }
 
 #[macro_use]
-pub fn record_ready_priority(priority: UBaseType_t) {
+pub fn record_ready_priority(priority: UBaseType) {
     if priority > get_top_ready_priority!() {
         set_top_ready_priority!(priority);
     }
@@ -348,12 +351,12 @@ impl TaskHandle {
     }
 
     #[cfg(feature = "configUSE_MUTEXES")]
-    pub fn get_mutex_held_count(&self) -> UBaseType_t {
+    pub fn get_mutex_held_count(&self) -> UBaseType {
         GetTaskControlBlockRead!(self).get_mutex_held_count()
     }
 
     #[cfg(feature = "configUSE_MUTEXES")]
-    pub fn set_mutex_held_count(&self, new_count: UBaseType_t) {
+    pub fn set_mutex_held_count(&self, new_count: UBaseType) {
         GetTaskControlBlockWrite!(self).set_mutex_held_count(new_count)
     }
 
@@ -381,11 +384,80 @@ impl TaskHandle {
         GetTaskControlBlockRead!(self).get_name()
     }
 
-    pub fn get_priority(&self) -> UBaseType_t {
+    pub fn get_priority(&self) -> UBaseType {
         GetTaskControlBlockRead!(self).get_priority()
     }
 
-    pub fn set_priority(&self, priority: UBaseType_t) {
+    pub fn set_priority(&self, priority: UBaseType) {
         GetTaskControlBlockWrite!(self).set_priority(priority)
+    }
+
+    pub fn set_priority_in_detail(&mut self, priority: UBaseType) {
+        let mut priority = priority;
+        let mut yielding = false;
+        let mut current_base_priority: UBaseType = 0;
+        let mut priority_used_on_entry: UBaseType = 0;
+
+        if priority > configMAX_PRIORITIES!() as UBaseType {
+            // Warning: Priority exceeded
+            priority = (configMAX_PRIORITIES!() - 1) as UBaseType;
+        }
+
+        taskENTER_CRITICAL!();
+        {
+            let tcb = GetTaskControlBlockWrite!(self);
+            let px_tcb: &TaskControlBlock = &tcb;
+            traceTASK_PRIORITY_SET!(px_tcb, priority);
+
+            {
+                #![cfg(feature = "configUSE_MUTEXES")]
+                current_base_priority = px_tcb.get_base_priority();
+            }
+
+            {
+                #![cfg(not(feature = "configUSE_MUTEXES"))]
+                current_base_priority = px_tcb.get_priority();
+            }
+
+            if current_base_priority != priority {
+                if self != &mut get_current_task_handle!() {
+                    if priority > get_current_task_priority!() {
+                        yielding = true;
+                    }
+                }
+            }
+            else if self == &mut get_current_task_handle!() {
+                yielding = true;
+            }
+
+            {
+                #![cfg(feature = "configUSE_MUTEXES")]
+                if px_tcb.get_base_priority() == px_tcb.get_priority() {
+                    px_tcb.set_priority(priority);
+                }
+                px_tcb.set_base_priority(priority);
+            }
+
+            let event_list_item = px_tcb.get_event_list_item();
+            let state_list_item = px_tcb.get_state_list_item();
+
+            unsafe {
+                if (list::listGET_LIST_ITEM_VALUE(&event_list_item) & taskEVENT_LIST_ITEM_VALUE_IN_USE) == 0 {
+                    list::listSET_LIST_ITEM_VALUE(&event_list_item, (configMAX_PRIORITIES!() - priority) as TickType);
+                }
+            }
+
+            if list::is_contained_within(&READY_TASK_LISTS[priority_used_on_entry as usize], &state_list_item) {
+                if list::list_remove(state_list_item) == 0 {
+                    portRESET_READY_PRIORITY!(priority_used_on_entry, get_top_ready_priority!());
+                }
+                self.add_task_to_ready_list();
+            }
+
+            if yielding {
+                taskYIELD_IF_USING_PREEMPTION!();
+            }
+        }
+        taskEXIT_CRITICAL!();
     }
 }
