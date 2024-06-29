@@ -634,3 +634,45 @@ pub fn task_delete(task_to_delete: Option<TaskHandle>) {
     }
     taskEXIT_CRITICAL!();
 }
+
+#[cfg(feature = "INCLUDE_vTaskSuspend")]
+pub fn is_task_suspended(task: &TaskHandle) -> bool {
+    let mut result = false;
+    let tcb = GetTaskControlBlockRead!(task);
+    
+    // Check if the task is in the suspended list
+    if list::is_contained_within(&SUSPENDED_TASK_LIST, &tcb.get_state_list_item()) {
+        // The task is in the pending ready list
+        if !list::is_contained_within(&PENDING_READY_LIST, &tcb.get_event_list_item()) {
+            // The task is not waiting for an event
+            if list::get_list_item_container(tcb.get_event_list_item()).is_some() {
+                result = true;
+            }
+        }
+    }
+    result
+}
+
+#[cfg(feature = "INCLUDE_vTaskSuspend")]
+pub fn resume_task(task: TaskHandle) {
+    let mut tcb = GetTaskControlBlockRead!(task);
+    
+    if task != get_current_task_handle!() {
+        taskENTER_CRITICAL!();
+        {
+            if is_task_suspended(&task) {
+                traceTASK_RESUME!(&tcb);
+
+                list::list_remove(tcb.get_state_list_item());
+                task.add_task_to_ready_list();
+
+                let current_priority = get_current_task_handle!().get_priority();
+                if current_priority <= tcb.get_priority() {
+                    // Yield if the new priority is higher
+                    taskYIELD_IF_USING_PREEMPTION!();
+                }
+            }
+        }
+        taskEXIT_CRITICAL!();
+    }
+}
