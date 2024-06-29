@@ -93,7 +93,7 @@ pub struct TaskControlBlock {
     state_list_item: ListItem,
     event_list_item: ListItem,
     priority: UBaseType,
-    task_name: String
+    task_name: String,
     stack_pointer: StackType_t,
     stack_length: UBaseType,
 
@@ -205,7 +205,7 @@ impl TaskControlBlock {
     #[cfg(feature = "configGENERATE_RUN_TIME_STATS")]
     pub fn set_runtime(&mut self, next_val: TickType_t) -> TickType_t {
         let prev_val = self.runtime_counter;
-        self.runtime_counter = next_val
+        self.runtime_counter = next_val;
         prev_val
     }
 
