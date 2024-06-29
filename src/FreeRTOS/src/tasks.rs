@@ -3,7 +3,10 @@ use alloc::sync::{Arc, Weak};
 use core::ops::FnOnce;
 use core::mem;
 use crate::port;
+use cty;
 use no_std_async::rwlock::RwLock;
+
+pub type TaskHandleType = *mut cty::c_void;
 
 #[cfg(configUSE_PREEMPTION!() = 0)]
 macro_rules! taskYIELD_IF_USING_PREEMPTION { () => { } }
@@ -262,11 +265,11 @@ impl TaskControlBlock {
         
         let stack_ptr = self.stack;
         let handle = TaskHandle(Arc::new(RwLock::new(self)));
-        list::set_list_item_owner(&handle.GetStateListItem(), handle.clone());
-        list::set_list_item_owner(&handle.GetEventListItem(), handle.clone());
-        list::set_list_item_owner(&handle.GetStackListItem(), handle.clone());
-        let item_value = (configMAX_PRIORITIES!() - handle.GetPriority()) as TickType;
-        list::listSET_LIST_ITEM_VALUE(&handle.GetStackListItem(), item_value);
+        list::set_list_item_owner(&handle.get_state_list_item(), handle.clone());
+        list::set_list_item_owner(&handle.get_event_list_item(), handle.clone());
+        list::set_list_item_owner(&handle.get_stack_list_item(), handle.clone());
+        let item_value = (configMAX_PRIORITIES!() - handle.get_priority()) as TickType;
+        list::listSET_LIST_ITEM_VALUE(&handle.get_stack_list_item(), item_value);
         Ok(handle)
     }
 }
@@ -323,3 +326,66 @@ macro_rules! GetTaskControlBlockWrite {
     }
 }
 
+impl TaskHandle {
+    #[cfg(feature = "configGENERATE_RUN_TIME_STATS")]
+    pub fn get_runtime(&self) -> TickType_t {
+        GetTaskControlBlockRead!(self).get_runtime()
+    }
+
+    #[cfg(feature = "configGENERATE_RUN_TIME_STATS")]
+    pub fn set_runtime(&self, next_val: TickType_t) -> TickType_t {
+        GetTaskControlBlockWrite!(self).set_runtime(next_val)
+    }
+
+    #[cfg(feature = "INCLUDE_xTaskAbortDelay")]
+    pub fn get_delay_aborted(&self) -> bool {
+        GetTaskControlBlockRead!(self).get_delay_aborted()
+    }
+
+    #[cfg(feature = "INCLUDE_xTaskAbortDelay")]
+    pub fn set_delay_aborted(&self, next_val: bool) -> bool {
+        GetTaskControlBlockWrite!(self).set_delay_aborted(next_val)
+    }
+
+    #[cfg(feature = "configUSE_MUTEXES")]
+    pub fn get_mutex_held_count(&self) -> UBaseType_t {
+        GetTaskControlBlockRead!(self).get_mutex_held_count()
+    }
+
+    #[cfg(feature = "configUSE_MUTEXES")]
+    pub fn set_mutex_held_count(&self, new_count: UBaseType_t) {
+        GetTaskControlBlockWrite!(self).set_mutex_held_count(new_count)
+    }
+
+    pub fn from_arc(arc: Arc<RwLock<TaskControlBlock>>) -> Self {
+        TaskHandle(arc)
+    }
+
+    pub fn from(tcb: TaskControlBlock) -> Self {
+        TaskHandle(Arc::new(RwLock::new(tcb)))
+    }
+
+    pub fn as_raw(self) -> TaskHandleType {
+        Arc::into_raw(self.0) as TaskHandleType
+    }
+
+    pub fn get_event_list_item(&self) -> ListItem {
+        GetTaskControlBlockRead!(self).get_event_list_item()
+    }
+
+    pub fn get_state_list_item(&self) -> ListItem {
+        GetTaskControlBlockRead!(self).get_state_list_item()
+    }
+
+    pub fn get_name(&self) -> String {
+        GetTaskControlBlockRead!(self).get_name()
+    }
+
+    pub fn get_priority(&self) -> UBaseType_t {
+        GetTaskControlBlockRead!(self).get_priority()
+    }
+
+    pub fn set_priority(&self, priority: UBaseType_t) {
+        GetTaskControlBlockWrite!(self).set_priority(priority)
+    }
+}
