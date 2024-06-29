@@ -3,6 +3,7 @@ use alloc::sync::{Arc, Weak};
 use core::ops::FnOnce;
 use core::mem;
 use crate::port;
+use crate::task_global;
 use cty;
 use no_std_async::rwlock::RwLock;
 
@@ -459,5 +460,55 @@ impl TaskHandle {
             }
         }
         taskEXIT_CRITICAL!();
+    }
+
+    pub fn get_base_priority(&self) -> UBaseType {
+        GetTaskControlBlockRead!(self).get_base_priority()
+    }
+
+    pub fn set_base_priority(&self, priority: UBaseType) {
+        GetTaskControlBlockWrite!(self).set_base_priority(priority)
+    }
+
+    pub fn add_task_to_ready_list(&self) -> Result<(), FreeRtosError> {
+        let tcb = GetTaskControlBlockWrite!(self);
+        let priority = self.get_priority();
+        traceMOVED_TASK_TO_READY_STATE!(&tcb);
+        record_ready_priority(priority);
+        // Insert to list
+        list::list_insert_end(&READY_TASK_LISTS[priority as usize], &Arc::clone(&tcb.get_state_list_item()));
+        tracePOST_MOVED_TASK_TO_READY_STATE!(&tcb);
+        Ok(())
+    }
+
+    fn add_new_task_to_ready_list(&self) -> Result<(), FreeRtosError> {
+        let tcb = GetTaskControlBlockWrite!(self);
+        taskENTER_CRITICAL!();
+        {
+            let current_number_of_tasks = get_current_number_of_tasks!() + 1;
+            set_current_number_of_tasks!(current_number_of_tasks);
+            if task_global::CURRENT_TCB.read().unwrap().is_none() {
+                set_current_task_handle!(self.clone());
+            }
+            else {
+                let task_handle = get_current_task_handle!();
+                if !get_scheduler_running!() {
+                    if task_handle.get_priority() < tcb.get_priority() {
+                        set_current_task_handle!(self.clone());
+                    }
+                }
+            }
+            set_task_number!(get_task_number!() + 1);
+            traceTASK_CREATE!(self.clone());
+            self.add_task_to_ready_list();
+        }
+        taskEXIT_CRITICAL!();
+        if GetSchedulerRunning!() {
+            let current_priority = get_current_task_priority!();
+            if current_priority < tcb.priority {
+                taskYIELD_IF_USING_PREEMPTION!();
+            }
+        }
+        Ok(())
     }
 }
