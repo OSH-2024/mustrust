@@ -94,7 +94,7 @@ pub struct TaskControlBlock {
     event_list_item: ListItem,
     priority: UBaseType,
     task_name: String
-    stack: StackType_t,
+    stack_pointer: StackType_t,
     stack_length: UBaseType,
 
     #[cfg(feature = "portCRITICAL_NESTING_IN_TCB")]
@@ -115,7 +115,7 @@ pub struct TaskControlBlock {
 
 impl PartialEq for TaskControlBlock {
     fn eq(&self, other: &Self) -> bool {
-        self.stack == other.stack
+        self.stack_pointer == other.stack_pointer
     }
 }
 
@@ -126,7 +126,7 @@ impl TaskControlBlock {
             event_list_item: ListItem::default(),
             priority: 1,
             task_name: String::from("New task"),
-            stack: 0,
+            stack_pointer: 0,
             stack_length: configMINIMAL_STACK_SIZE!(),
             #[cfg(feature = "portCRITICAL_NESTING_IN_TCB")]
             critical_nesting: 0,
@@ -239,8 +239,8 @@ impl TaskControlBlock {
         let stacksize_as_bytes = size_of_stacktype * self.stack_length as usize;
         // Initialize stack
         let px_stack = port::port_malloc(stacksize_as_bytes)?;
-        self.stack = px_stack as *mut StackType;
-        let mut top_of_stack = self.stack + self.stack_length - 1;
+        self.stack_pointer = px_stack as *mut StackType;
+        let mut top_of_stack = self.stack_pointer + self.stack_length - 1;
         top_of_stack = top_of_stack & portBYTE_ALIGNMENT_MASK as *mut StackType;
         // Initialize task
         let f = Box::new(Box::new(func) as Box<dyn FnOnce()>);
@@ -267,7 +267,7 @@ impl TaskControlBlock {
             self.runtime_counter = 0;
         }
         
-        let stack_ptr = self.stack;
+        let stack_ptr = self.stack_pointer;
         let handle = TaskHandle(Arc::new(RwLock::new(self)));
         list::set_list_item_owner(&handle.get_state_list_item(), handle.clone());
         list::set_list_item_owner(&handle.get_event_list_item(), handle.clone());
@@ -525,9 +525,6 @@ pub fn add_current_task_to_delayed_list(ticks_to_delay: TickType, can_block_inde
         // Reset the highest priority of the ready list
         portRESET_READY_PRIORITY!(current_task_handle.get_priority(), get_top_ready_priority!());
     }
-    else {
-        // Error
-    }
 
     {
         // INCLUDE_vTaskSuspend is defined
@@ -580,4 +577,60 @@ pub fn add_current_task_to_delayed_list(ticks_to_delay: TickType, can_block_inde
             }
         }
     }
+}
+
+pub fn reset_next_task_unblock_time() {
+    if list::list_is_empty(&DELAYED_TASK_LIST) {
+        // No tasks were blocked, so the next unblock time is set to portMAX_DELAY
+        set_next_unblock_time!(port::portMAX_DELAY);
+    }
+    else {
+        // Get the handle of the first entry in the delayed task list
+        let mut temp = get_owner_of_head_entry(&DELAYED_TASK_LIST);
+        set_next_unblock_time!(list::listGET_LIST_ITEM_VALUE(&temp.get_state_list_item()));
+    }
+}
+
+#[cfg(feature = "INCLUDE_vTaskDelete")]
+pub fn task_delete(task_to_delete: Option<TaskHandle>) {
+    let tcb = GetTaskControlBlockWrite!(task_to_delete);
+    
+    taskENTER_CRITICAL!();
+    {
+        if list::list_remove(tcb.get_state_list_item()) == 0 {
+            // Removed from ready list
+            // Reset the highest priority of the ready list
+            portRESET_READY_PRIORITY!(tcb.get_priority(), get_priority!());
+        }
+
+        if list::get_list_item_container(tcb.get_event_list_item()).is_some() {
+            // Reset the event list item
+            list::list_remove(tcb.get_event_list_item());
+        }
+
+        set_task_number!(get_task_number!() + 1);
+
+        if tcb == get_current_task_handle!() {
+            // If the task being deleted is the currently running task then
+            // insert it end of the waiting termination list
+            list::list_insert_end(&TASKS_WAITING_TERMINATION, tcb.get_state_list_item());
+
+            // Add the number of deleted tasks waiting to be cleaned up
+            set_deleted_tasks_waiting_clean_up!(get_deleted_tasks_waiting_clean_up!() + 1);
+
+            portPRE_TASK_DELETE_HOOK!();
+        }
+        else {
+            // Decrease the number of tasks
+            set_current_number_of_tasks!(get_current_number_of_tasks!() - 1);
+
+            // Release the task's memory
+            let stack_pointer = GetTaskControlBlockRead!(tcb).stack_pointer;
+            port::port_free(stack_pointer as *mut _);
+
+            // Reset the next unblock time
+            reset_next_task_unblock_time();
+        }
+    }
+    taskEXIT_CRITICAL!();
 }
