@@ -338,9 +338,6 @@ pub fn get_list_item_container(item: &ItemLink) -> Option<ListLink> {
     container.upgrade()
 }
 
-pub fn vListInitialise(item: &mut ItemLink) {
-    let ItemLink = xLIST::default();
-}
 
 /// 获取链表的入口节点
 /// return type: Weak<RwLock<xLIST_ITEM>>
