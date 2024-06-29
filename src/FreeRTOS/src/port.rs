@@ -8,9 +8,7 @@ pub type TickType = u32;
 pub type CVoidPointer = *mut cty::c_void;
 
 pub const portBYTE_ALIGNMENT_MASK: UBaseType = 4;
-//pub const portMAX_DELAY: TickType = configUSE_16_BIT_TICKS!() ? 0xffff : 0xffffffff;
 pub const portMAX_DELAY: TickType = if configUSE_16_BIT_TICKS!() { 0xffff } else { 0xffffffff };
-
 
 #[macro_export]
 macro_rules! portYIELD { () => { unsafe { asm!("SVC 0"); } } }
