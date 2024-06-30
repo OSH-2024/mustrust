@@ -8,13 +8,14 @@
 /// pub type WeakListLink = Weak<RwLock<List_t>>;
 
 
-use std::sync::{Arc, RwLock, Weak};
+use alloc::sync::{Arc, Weak};
+use no_std_async::RwLock;
 
 use crate::port::{portMAX_DELAY, TickType_t, UBaseType_t};
-use crate::task::{TCB, TaskHandle};
+use crate::tasks::{TaskControlBlock, TaskHandle};
 
 /// 暂时未实现：listGET_NEXT listGET_END_MARKER
-/// not varified: TCB、 TaskHandle
+/// not varified: TaskControlBlock、 TaskHandle
 
 pub struct xLIST_ITEM
 {
@@ -24,8 +25,8 @@ pub struct xLIST_ITEM
 	pxNext: WeakItemLink,     
     // 双向引用
 	pxPrevious: WeakItemLink,	
-	// 指向拥有该结点的内核对象，通常是TCB
-    pvOwner: Weak<RwLock<TCB>>,										
+	// 指向拥有该结点的内核对象，通常是TaskControlBlock
+    pvOwner: Weak<RwLock<TaskControlBlock>>,										
 	// 指向该节点所在的链表 双向引用
     pvContainer: Weak<RwLock<List_t>>,				
 }
@@ -180,7 +181,7 @@ impl xLIST {
         /* Insert the new list item into the list, sorted in xItemValue order.
 
         If the list already contains a list item with the same item value then the
-        new list item should be placed after it.  This ensures that TCB's which are
+        new list item should be placed after it.  This ensures that TaskControlBlock's which are
         stored in ready lists (all of which have the same xItemValue value) get a
         share of the CPU.  However, if the xItemValue is the same as the back marker
         the iteration loop below will not end.  Therefore the value is checked
@@ -250,7 +251,7 @@ impl xLIST {
     }
 
     
-    fn get_owner_of_next_entry(&mut self) -> Weak<RwLock<TCB>> {
+    fn get_owner_of_next_entry(&mut self) -> Weak<RwLock<TaskControlBlock>> {
         self.increment_index();
         let owned_index = self
             .pxIndex
@@ -260,7 +261,7 @@ impl xLIST {
         owner
     }
 
-    fn get_owner_of_head_entry(&self) -> Weak<RwLock<TCB>> {
+    fn get_owner_of_head_entry(&self) -> Weak<RwLock<TaskControlBlock>> {
         let list_end = get_list_item_next(&Arc::downgrade(&self.xListEnd));
         let owned_index = list_end
             .upgrade()

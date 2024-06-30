@@ -5,18 +5,20 @@ use core::mem;
 use crate::port;
 use crate::task_global;
 use cty;
-use no_std_async::rwlock::RwLock;
+use no_std_async::RwLock;
 
 pub type TaskHandleType = *mut cty::c_void;
 
-#[cfg(configUSE_PREEMPTION!() = 0)]
+#[cfg(feature = "configUSE_PREEMPTION")]
 macro_rules! taskYIELD_IF_USING_PREEMPTION { () => { } }
 
-#[cfg(configUSE_PREEMPTION!() = 1)]
+#[cfg(not(feature = "configUSE_PREEMPTION"))]
 macro_rules! taskYIELD_IF_USING_PREEMPTION { () => { portYIELD_WITHIN_API!() } }
 
 #[macro_export]
 macro_rules! taskENTER_CRITICAL { () => { portENTER_CRITICAL!() } }
+#[macro_export]
+macro_rules! taskEXIT_CRITICAL { () => { portEXIT_CRITICAL!() } }
 
 #[macro_export]
 macro_rules! taskNOT_WAITING_NOTIFICATION { () => { 0 as u8 } }
