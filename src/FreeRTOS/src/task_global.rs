@@ -312,7 +312,7 @@ macro_rules! get_current_task_handle_wrapped {
 #[macro_export]
 macro_rules! get_current_task_handle {
     () => {
-        *crate::task_global::CURRENT_TCB.read().as_ref().clone().expect("No current TCB")
+        crate::task_global::CURRENT_TCB.read().as_ref().unwrap().clone()
     };
 }
 

@@ -1,4 +1,4 @@
-// From https://github.com/ytakano/synctools/blob/main/Cargo.toml
+// From https://github.com/ytakano/synctools/blob/main/src/rwlock.rs
 // and added impl Default
 
 use core::marker::PhantomData;

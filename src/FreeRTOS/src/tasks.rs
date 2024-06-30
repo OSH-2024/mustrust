@@ -71,7 +71,7 @@ fn taskSelectHighestPriorityTask() {
     let mut uxTopPriority: UBaseType = get_top_ready_priority!();
 
     /* Find the highest priority queue that contains ready tasks. */
-    while list::list_is_empty(&READY_TASK_LISTS[uxTopPriority as usize]) {
+    while list::listLIST_IS_EMPTY(&READY_TASK_LISTS[uxTopPriority as usize]) {
         assert!(uxTopPriority > 0, "No non-zero priority task found.");
         uxTopPriority -= 1;
     }
@@ -488,7 +488,7 @@ impl TaskHandle {
                 set_current_task_handle!(self.clone());
             }
             else {
-                let task_handle = get_current_task_handle!();
+                let task_handle = &get_current_task_handle!();
                 if !get_scheduler_running!() {
                     if task_handle.get_priority() < tcb.get_priority() {
                         set_current_task_handle!(self.clone());
@@ -539,11 +539,11 @@ pub fn add_current_task_to_delayed_list(ticks_to_delay: TickType, can_block_inde
 
             if time < get_tick_count!() {
                 // Add the task to overflow delayed list
-                list::vListInsert(&OVERFLOW_DELAYED_TASK_LIST, &current_state_list_item);
+                list::list_insert(&OVERFLOW_DELAYED_TASK_LIST, &current_state_list_item);
             }
             else {
                 // Add the task to delayed list
-                list::vListInsert(&DELAYED_TASK_LIST, &current_state_list_item);
+                list::list_insert(&DELAYED_TASK_LIST, &current_state_list_item);
 
                 // Next task unblock time should be updated
                 if time < get_next_task_unblock_time!() {
@@ -562,11 +562,11 @@ pub fn add_current_task_to_delayed_list(ticks_to_delay: TickType, can_block_inde
 
         if time < get_tick_count!() {
             // Add the task to overflow delayed list
-            list::vListInsert(&OVERFLOW_DELAYED_TASK_LIST, &current_state_list_item);
+            list::list_insert(&OVERFLOW_DELAYED_TASK_LIST, &current_state_list_item);
         }
         else {
             // Add the task to delayed list
-            list::vListInsert(&DELAYED_TASK_LIST, &current_state_list_item);
+            list::list_insert(&DELAYED_TASK_LIST, &current_state_list_item);
 
             // Next task unblock time should be updated
             if time < get_next_task_unblock_time!() {
@@ -577,7 +577,7 @@ pub fn add_current_task_to_delayed_list(ticks_to_delay: TickType, can_block_inde
 }
 
 pub fn reset_next_task_unblock_time() {
-    if list::list_is_empty(&DELAYED_TASK_LIST) {
+    if list::listLIST_IS_EMPTY(&DELAYED_TASK_LIST) {
         // No tasks were blocked, so the next unblock time is set to portMAX_DELAY
         set_next_task_unblock_time!(port::portMAX_DELAY);
     }
@@ -607,7 +607,7 @@ pub fn task_delete(task_to_delete: TaskHandle) {
 
         set_task_number!(get_task_number!() + 1);
 
-        if *tcb == *GetTaskControlBlockRead!(&get_current_task_handle!()) {
+        if *tcb == *GetTaskControlBlockRead!(get_current_task_handle!()) {
             // If the task being deleted is the currently running task then
             // insert it end of the waiting termination list
             list::list_insert_end(&TASKS_WAITING_TERMINATION, &tcb.get_state_list_item());
