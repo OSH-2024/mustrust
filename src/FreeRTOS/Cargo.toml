@@ -8,9 +8,9 @@ edition = "2021"
 [dependencies]
 cty = "*"
 lazy_static = {version = "1.5.0", features = ["spin_no_std"]}
-no-std-async = "1.1.2"
 panic-abort = "0.3.2"
 panic-halt = "0.2.0"
+synctools = "0.3.3"
 
 [build-dependencies]
 cc = "1.0"
