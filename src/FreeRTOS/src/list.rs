@@ -37,7 +37,7 @@ pub type WeakItemLink = Weak<RwLock<ListItem_t>>;
 
 impl Default for xLIST_ITEM{
     // 替代 vListInitialiseItem
-    fn default() -> Self {
+    async fn default() -> Self {
         xLIST_ITEM{
             /* The list end value is the highest possible value in the list to
             ensure it remains at the end of the list. */
@@ -53,32 +53,32 @@ impl Default for xLIST_ITEM{
 
 impl xLIST_ITEM {
     // item_value 
-    //pub fn set_value(mut self, item_value: TickType_t) -> Self {
+    //pub async fn set_value(mut self, item_value: TickType_t) -> Self {
     //    self.xItemValue = item_value;
     //    self
     //}
 
-    pub fn new(item_value: TickType_t) -> Self {
+    pub async fn new(item_value: TickType_t) -> Self {
         let mut item = ListItem_t::default();
         item.set_value(item_value);
         item
     }
 
-    pub fn set_value(&mut self, item_value: TickType_t) {
+    pub async fn set_value(&mut self, item_value: TickType_t) {
         self.xItemValue = item_value;
     }
 
-    pub fn owner(mut self, owner: TaskHandle) -> Self {
+    pub async fn owner(mut self, owner: TaskHandle) -> Self {
         self.pvOwner = owner.into();
         self
     }
 
-    pub fn set_container(&mut self, container: &Arc<RwLock<List_t>>) {
+    pub async fn set_container(&mut self, container: &Arc<RwLock<List_t>>) {
         self.pvContainer = Arc::downgrade(container);
     }
 
     
-    fn remove(&mut self, link: WeakItemLink) -> UBaseType_t {
+    async fn remove(&mut self, link: WeakItemLink) -> UBaseType_t {
         /* The list item knows which list it is in.  Obtain the list from the list
         item. */
         let list = self
@@ -98,7 +98,7 @@ impl xLIST_ITEM {
 }
 
 /// get Arc<RwLock<xLIST_ITEM>>
-pub fn new_list_item(item_value: TickType_t) -> Arc<RwLock<xLIST_ITEM>> {
+pub async fn new_list_item(item_value: TickType_t) -> Arc<RwLock<xLIST_ITEM>> {
     let mut raw_list_item = ListItem_t::default();
     raw_list_item.set_value(item_value);
     let item: Arc<RwLock<xLIST_ITEM>> = Arc::new(RwLock::new(raw_list_item));
@@ -136,7 +136,7 @@ pub type WeakListLink = Weak<RwLock<List_t>>;
 
 impl Default for xLIST{
     // 替代 vListInitialise
-    fn default() -> Self {
+    async fn default() -> Self {
         /* The list structure contains a list item which is used to mark the
         end of the list.  To initialise the list the list end is inserted
         as the only list entry. */
@@ -146,8 +146,8 @@ impl Default for xLIST{
         // 将最后一个节点的 pxNext 与 pxPrevious 指向自身
         /* The list end next and previous pointers point to itself so we know
         when the list is empty. */
-        (*list_end.write().unwrap()).pxNext = Arc::downgrade(&list_end);
-        (*list_end.write().unwrap()).pxPrevious = Arc::downgrade(&list_end);
+        (**list_end.write().await).pxNext = Arc::downgrade(&list_end);
+        (**list_end.write().await).pxPrevious = Arc::downgrade(&list_end);
 
         xLIST {
             // 计数器为0，链表为空
@@ -160,7 +160,7 @@ impl Default for xLIST{
 }
 
 impl xLIST {
-    pub fn traverse(& self) {
+    pub async fn traverse(& self) {
         let mut iterator = Arc::downgrade(&self.xListEnd);
         loop {
             /* There is nothing to do here, just iterating to the wanted
@@ -175,7 +175,7 @@ impl xLIST {
         }
     }
 
-    fn insert(&mut self, item_link: WeakItemLink) {
+    async fn insert(&mut self, item_link: WeakItemLink) {
         // println!("in");
         let value_of_insertion = get_weak_item_value(&item_link);
         /* Insert the new list item into the list, sorted in xItemValue order.
@@ -213,7 +213,7 @@ impl xLIST {
     }
 
     // insert before pxIndex
-    pub fn insert_end(&mut self, item_link: WeakItemLink) {
+    pub async fn insert_end(&mut self, item_link: WeakItemLink) {
         let prev = get_list_item_prev(&self.pxIndex);
         let next = Weak::clone(&self.pxIndex);
         set_list_item_next(&item_link, Weak::clone(&next));
@@ -224,7 +224,7 @@ impl xLIST {
         self.uxNumberOfItems += 1;
     }
 
-    fn remove_item(&mut self, item: &xLIST_ITEM, link: WeakItemLink) -> UBaseType_t {
+    async fn remove_item(&mut self, item: &xLIST_ITEM, link: WeakItemLink) -> UBaseType_t {
         // TODO: Find a more effiecient
         if Weak::ptr_eq(&link, &self.pxIndex) {
             self.pxIndex = Weak::clone(&item.pxPrevious);
@@ -235,15 +235,15 @@ impl xLIST {
         self.uxNumberOfItems
     }
 
-    fn is_empty(&self) -> bool {
+    async fn is_empty(&self) -> bool {
         self.uxNumberOfItems == 0
     }
 
-    fn get_length(&self) -> UBaseType_t {
+    async fn get_length(&self) -> UBaseType_t {
         self.uxNumberOfItems
     }
 
-    pub fn increment_index(&mut self) {
+    pub async fn increment_index(&mut self) {
         self.pxIndex = get_list_item_next(&self.pxIndex);
         if Weak::ptr_eq(&self.pxIndex, &Arc::downgrade(&self.xListEnd)) {
             self.pxIndex = get_list_item_next(&self.pxIndex);
@@ -251,29 +251,29 @@ impl xLIST {
     }
 
     
-    fn get_owner_of_next_entry(&mut self) -> Weak<RwLock<TaskControlBlock>> {
+    async fn get_owner_of_next_entry(&mut self) -> Weak<RwLock<TaskControlBlock>> {
         self.increment_index();
         let owned_index = self
             .pxIndex
             .upgrade()
             .unwrap_or_else(|| panic!("List item is None"));
-        let owner = Weak::clone(&owned_index.read().unwrap().owner);
+        let owner = Weak::clone(&owned_index.read().await.owner);
         owner
     }
 
-    fn get_owner_of_head_entry(&self) -> Weak<RwLock<TaskControlBlock>> {
+    async fn get_owner_of_head_entry(&self) -> Weak<RwLock<TaskControlBlock>> {
         let list_end = get_list_item_next(&Arc::downgrade(&self.xListEnd));
         let owned_index = list_end
             .upgrade()
             .unwrap_or_else(|| panic!("List item is None"));
-        let owner = Weak::clone(&owned_index.read().unwrap().owner);
+        let owner = Weak::clone(&owned_index.read().await.owner);
         owner
     }
     
 }
 
 // 替换 item.pxNext = next;
-fn set_list_item_next(item: &WeakItemLink, next: WeakItemLink) {
+async fn set_list_item_next(item: &WeakItemLink, next: WeakItemLink) {
     let owned_item: Arc<RwLock<xLIST_ITEM>> = item
         .upgrade()
         .unwrap_or_else(|| panic!("List item is None"));
@@ -281,122 +281,122 @@ fn set_list_item_next(item: &WeakItemLink, next: WeakItemLink) {
     // owned_item.write(): Result<RwLockWriteGuard<xLIST_ITEM>, PoisonError<RwLockWriteGuard<xLIST_ITEM>>>
     // owned_item.write().unwrap(): RwLockWriteGuard<xLIST_ITEM>
     // *owned_item.write().unwrap(): xLIST_ITEM
-    (*owned_item.write().unwrap()).pxNext = next;
+    (**owned_item.write().await).pxNext = next;
 }
 
 // 替换 item.pxPrevious = prev;
-fn set_list_item_prev(item: &WeakItemLink, prev: WeakItemLink) {
+async fn set_list_item_prev(item: &WeakItemLink, prev: WeakItemLink) {
     let owned_item = item
         .upgrade()
         .unwrap_or_else(|| panic!("List item is None"));
-    (*owned_item.write().unwrap()).pxPrevious = prev;
+    (**owned_item.write().await).pxPrevious = prev;
 }
 
-fn get_list_item_next(item: &WeakItemLink) -> WeakItemLink {
+async fn get_list_item_next(item: &WeakItemLink) -> WeakItemLink {
     let owned_item = item
         .upgrade()
         .unwrap_or_else(|| panic!("List item is None"));
-    let next = Weak::clone(&(*owned_item.read().unwrap()).pxNext);
+    let next = Weak::clone(&(**owned_item.read().await).pxNext);
     next
 }
 
-fn get_list_item_prev(item: &WeakItemLink) -> WeakItemLink {
+async fn get_list_item_prev(item: &WeakItemLink) -> WeakItemLink {
     let owned_item: Arc<RwLock<xLIST_ITEM>> = item
         .upgrade()
         .unwrap_or_else(|| panic!("List item is None"));
-    let prev = Weak::clone(&(*owned_item.read().unwrap()).pxPrevious);
+    let prev = Weak::clone(&(**owned_item.read().await).pxPrevious);
     prev
 }
 
 /// get_list_item_value
-pub fn listGET_LIST_ITEM_VALUE(item: &ItemLink) -> TickType_t {
-    (*item.read().unwrap()).xItemValue
+pub async fn listGET_LIST_ITEM_VALUE(item: &ItemLink) -> TickType_t {
+    (**item.read().await).xItemValue
 }
 
 /// set_list_item_value
-pub fn listSET_LIST_ITEM_VALUE(item: &ItemLink, item_value: TickType_t) {
-    (*item.write().unwrap()).xItemValue = item_value;
+pub async fn listSET_LIST_ITEM_VALUE(item: &ItemLink, item_value: TickType_t) {
+    (**item.write().await).xItemValue = item_value;
 }
 
-pub fn get_weak_item_value(item: &WeakItemLink) -> TickType_t {
+pub async fn get_weak_item_value(item: &WeakItemLink) -> TickType_t {
     let owned_item: Arc<RwLock<xLIST_ITEM>> = item
         .upgrade()
         .unwrap_or_else(|| panic!("List item is None"));
-    let value = (*owned_item.read().unwrap()).xItemValue;
+    let value = (**owned_item.read().await).xItemValue;
     value
 }
 
-pub fn set_weak_item_value(item: &WeakItemLink, item_value: TickType_t) {
+pub async fn set_weak_item_value(item: &WeakItemLink, item_value: TickType_t) {
     let owned_item = item
         .upgrade()
         .unwrap_or_else(|| panic!("List item is None"));
-    owned_item.write().unwrap().xItemValue = item_value;
+    owned_item.write().await.xItemValue = item_value;
 }
 
-pub fn get_list_item_container(item: &ItemLink) -> Option<ListLink> {
+pub async fn get_list_item_container(item: &ItemLink) -> Option<ListLink> {
     //let owned_item = item.upgrade().unwrap_or_else(|| panic!("List item is None"));
-    let container = Weak::clone(&(*item.read().unwrap()).pvContainer);
+    let container = Weak::clone(&(**item.read().await).pvContainer);
     container.upgrade()
 }
 
 
 /// 获取链表的入口节点
 /// return type: Weak<RwLock<xLIST_ITEM>>
-pub fn listGET_HEAD_ENTRY( list: &ListLink ) -> Weak<RwLock<xLIST_ITEM>>{
-    let list_end = Arc::downgrade(&list.read().unwrap().xListEnd);
+pub async fn listGET_HEAD_ENTRY( list: &ListLink ) -> Weak<RwLock<xLIST_ITEM>>{
+    let list_end = Arc::downgrade(&list.read().await.xListEnd);
     get_list_item_next(&list_end)
 }
 
 /// 获取链表根节点的节点计数器的值
-pub fn listGET_ITEM_VALUE_OF_HEAD_ENTRY(list: &ListLink) -> TickType_t{
-    let list_end = Arc::downgrade(&list.read().unwrap().xListEnd);
+pub async fn listGET_ITEM_VALUE_OF_HEAD_ENTRY(list: &ListLink) -> TickType_t{
+    let list_end = Arc::downgrade(&list.read().await.xListEnd);
     let list_head = get_list_item_next(&list_end);
     get_weak_item_value(&list_head)
 }
 
 /// list_is_empty
-pub fn listLIST_IS_EMPTY(list: &ListLink) -> bool {
-    list.read().unwrap().is_empty()
+pub async fn listLIST_IS_EMPTY(list: &ListLink) -> bool {
+    list.read().await.is_empty()
 }
 
 /// current_list_length
-pub fn listCURRENT_LIST_LENGTH(list: &ListLink) -> UBaseType_t {
-    list.read().unwrap().get_length()
+pub async fn listCURRENT_LIST_LENGTH(list: &ListLink) -> UBaseType_t {
+    list.read().await.get_length()
 }
 
 
-pub fn get_list_item_owner(item_link: &ItemLink) -> TaskHandle {
-    let owner = Weak::clone(&item_link.read().unwrap().pvOwner);
+pub async fn get_list_item_owner(item_link: &ItemLink) -> TaskHandle {
+    let owner = Weak::clone(&item_link.read().await.pvOwner);
     owner.into()
 }
 
-pub fn set_list_item_owner(item_link: &ItemLink, owner: TaskHandle) {
-    item_link.write().unwrap().pvOwner = owner.into()
+pub async fn set_list_item_owner(item_link: &ItemLink, owner: TaskHandle) {
+    item_link.write().await.pvOwner = owner.into()
 } 
 
-pub fn get_owner_of_next_entry(list: &ListLink) -> TaskHandle {
-    let task = list.write().unwrap().get_owner_of_next_entry();
+pub async fn get_owner_of_next_entry(list: &ListLink) -> TaskHandle {
+    let task = list.write().await.get_owner_of_next_entry();
     task.into()
 }
 
-pub fn get_owner_of_head_entry(list: &ListLink) -> TaskHandle {
-    let task = list.read().unwrap().get_owner_of_head_entry();
+pub async fn get_owner_of_head_entry(list: &ListLink) -> TaskHandle {
+    let task = list.read().await.get_owner_of_head_entry();
     task.into()
 }
 
 
-pub fn is_contained_within(list: &ListLink, item_link: &ItemLink) -> bool {
+pub async fn is_contained_within(list: &ListLink, item_link: &ItemLink) -> bool {
     match get_list_item_container(&item_link) {
         Some(container) => Arc::ptr_eq(list, &container),
         None => false,
     }
 }
 
-pub fn list_initialise(item: &mut ItemLink) {
+pub async fn list_initialise(item: &mut ItemLink) {
     let ItemLink = xLIST::default();
 }
 
-pub fn list_initialiseItem(item: &mut ListItem) {
+pub async fn list_initialiseItem(item: &mut ListItem_t) {
     let ListItem = xLIST_ITEM::default();
 }
 
@@ -404,35 +404,34 @@ pub fn list_initialiseItem(item: &mut ListItem) {
 // why not use &ItemLink
 /// list_insert
 /// 将节点按照升序排列插入到链表
-pub fn list_insert(list: &ListLink, item_link: &ItemLink) {
+pub async fn list_insert(list: &ListLink, item_link: &ItemLink) {
     /* Remember which list the item is in.  This allows fast removal of the
     item later. */
-    item_link.write().unwrap().set_container(&list);
+    item_link.write().await.set_container(&list);
     // println!("Set conatiner");
-    list.write().unwrap().insert(Arc::downgrade(&item_link))
+    list.write().await.insert(Arc::downgrade(&item_link))
 }
 
 // why not use &ItemLink
 /// list_insert_end
 /// insert before pxIndex
-pub fn list_insert_end(list: &ListLink, item_link: &ItemLink) {
+pub async fn list_insert_end(list: &ListLink, item_link: &ItemLink) {
     /* Insert a new list item into pxList, but rather than sort the list,
     makes the new list item the last item to be removed by a call to
     listGET_OWNER_OF_NEXT_ENTRY(). */
 
     /* Remember which list the item is in. */
-    item_link.write().unwrap().set_container(&list);
+    item_link.write().await.set_container(&list);
 
-    list.write().unwrap().insert_end(Arc::downgrade(&item_link))
+    list.write().await.insert_end(Arc::downgrade(&item_link))
 }
 
 // why not use &ItemLink
 /// list_remove
 /// 传回剩余节点数
-pub fn list_remove(item_link: ItemLink) -> UBaseType_t {
+pub async fn list_remove(item_link: ItemLink) -> UBaseType_t {
     item_link
-        .write()
-        .unwrap()
+        .write().await
         .remove(Arc::downgrade(&item_link))
 }
 

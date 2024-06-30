@@ -107,7 +107,7 @@ pub struct TaskControlBlock {
     #[cfg(feature = "configUSE_MUTEXES")]
     mutexed_held: UBaseType,
     #[cfg(feature = "configGENERATE_RUN_TIME_STATS")]
-    runtime_counter: TickType_t,
+    runtime_counter: TickType,
     #[cfg(feature = "configUSE_TASK_NOTIFICATIONS")]
     notified_value: u32,
     #[cfg(feature = "configUSE_TASK_NOTIFICATIONS")]
@@ -123,7 +123,7 @@ impl PartialEq for TaskControlBlock {
 }
 
 impl TaskControlBlock {
-    pub fn new() -> Self {
+    pub async fn new() -> Self {
         Self {
             state_list_item: ListItem::default(),
             event_list_item: ListItem::default(),
@@ -148,25 +148,25 @@ impl TaskControlBlock {
         }
     }
 
-    pub fn get_name(&self) -> &str {
+    pub async fn get_name(&self) -> &str {
         self.task_name.as_str()
     }
 
-    pub fn set_name(&mut self, name: &str) -> Self {
+    pub async fn set_name(&mut self, name: &str) -> Self {
         self.task_name = String::from(name);
         self
     }
 
-    pub fn set_stack_length(&mut self, length: UBaseType) -> Self {
+    pub async fn set_stack_length(&mut self, length: UBaseType) -> Self {
         self.stack_length = length;
         self
     }
 
-    pub fn get_priority(&self) -> UBaseType {
+    pub async fn get_priority(&self) -> UBaseType {
         self.priority.clone()
     }
 
-    pub fn set_priority(mut self, priority: UBaseType) -> Self {
+    pub async fn set_priority(mut self, priority: UBaseType) -> Self {
         if priority > configMAX_PRIORITIES!() {
             // Warning: Priority exceeded
             self.priority = configMAX_PRIORITIES!() - 1;
@@ -177,11 +177,11 @@ impl TaskControlBlock {
         self
     }
 
-    pub fn get_base_priority(&self) -> UBaseType {
+    pub async fn get_base_priority(&self) -> UBaseType {
         self.base_priority
     }
 
-    pub fn set_base_priority(mut self, priority: UBaseType) -> Self {
+    pub async fn set_base_priority(mut self, priority: UBaseType) -> Self {
         if priority > configMAX_PRIORITIES!() {
             // Warning: Priority exceeded
             self.base_priority = configMAX_PRIORITIES!() - 1;
@@ -192,49 +192,49 @@ impl TaskControlBlock {
         self
     }
 
-    pub fn get_stack_list_item(&self) -> ListItem {
+    pub async fn get_stack_list_item(&self) -> ListItem {
         self.state_list_item.clone()
     }
 
-    pub fn get_event_list_item(&self) -> ListItem {
+    pub async fn get_event_list_item(&self) -> ListItem {
         self.event_list_item.clone()
     }
 
     #[cfg(feature = "configGENERATE_RUN_TIME_STATS")]
-    pub fn get_runtime(&self) -> TickType_t {
+    pub async fn get_runtime(&self) -> TickType {
         self.runtime_counter
     }
 
     #[cfg(feature = "configGENERATE_RUN_TIME_STATS")]
-    pub fn set_runtime(&mut self, next_val: TickType_t) -> TickType_t {
+    pub async fn set_runtime(&mut self, next_val: TickType) -> TickType {
         let prev_val = self.runtime_counter;
         self.runtime_counter = next_val;
         prev_val
     }
 
     #[cfg(feature = "INCLUDE_xTaskAbortDelay")]
-    pub fn get_delay_aborted(&self) -> bool {
+    pub async fn get_delay_aborted(&self) -> bool {
         self.delay_aborted
     }
 
     #[cfg(feature = "INCLUDE_xTaskAbortDelay")]
-    pub fn set_delay_aborted(&mut self, next_val: bool) -> bool {
+    pub async fn set_delay_aborted(&mut self, next_val: bool) -> bool {
         let prev_val = self.delay_aborted;
         self.delay_aborted = next_val;
         prev_val
     }
 
     #[cfg(feature = "configUSE_MUTEXES")]
-    pub fn get_mutex_held_count(&self) -> UBaseType {
+    pub async fn get_mutex_held_count(&self) -> UBaseType {
         self.mutexed_held
     }
 
     #[cfg(feature = "configUSE_MUTEXES")]
-    pub fn set_mutex_held_count(&mut self, new_count: UBaseType) {
+    pub async fn set_mutex_held_count(&mut self, new_count: UBaseType) {
         self.mutexed_held = new_count;
     }
 
-    pub fn initialize<F>(mut self, func: F) -> Result<TaskHandle, FreeRtosError>
+    pub async fn initialize<F>(mut self, func: F) -> Result<TaskHandle, FreeRtosError>
     where
         F: FnOnce() -> () + Send + 'static,
     {
@@ -286,7 +286,7 @@ pub struct TaskHandle(Arc<RwLock<TaskControlBlock>>);
 
 impl PartialEq for TaskHandle {
     fn eq(&self, other: &Self) -> bool {
-        *self.0.read().unwrap() == *other.0.read().unwrap()
+        **self.0.read().await == **other.0.read().await
     }
 }
 
@@ -307,7 +307,7 @@ impl From<TaskHandle> for Weak<RwLock<TaskControlBlock>> {
 }
 
 #[macro_use]
-pub fn record_ready_priority(priority: UBaseType) {
+pub async fn record_ready_priority(priority: UBaseType) {
     if priority > get_top_ready_priority!() {
         set_top_ready_priority!(priority);
     }
@@ -335,68 +335,68 @@ macro_rules! GetTaskControlBlockWrite {
 
 impl TaskHandle {
     #[cfg(feature = "configGENERATE_RUN_TIME_STATS")]
-    pub fn get_runtime(&self) -> TickType_t {
+    pub async fn get_runtime(&self) -> TickType {
         GetTaskControlBlockRead!(self).get_runtime()
     }
 
     #[cfg(feature = "configGENERATE_RUN_TIME_STATS")]
-    pub fn set_runtime(&self, next_val: TickType_t) -> TickType_t {
+    pub async fn set_runtime(&self, next_val: TickType) -> TickType {
         GetTaskControlBlockWrite!(self).set_runtime(next_val)
     }
 
     #[cfg(feature = "INCLUDE_xTaskAbortDelay")]
-    pub fn get_delay_aborted(&self) -> bool {
+    pub async fn get_delay_aborted(&self) -> bool {
         GetTaskControlBlockRead!(self).get_delay_aborted()
     }
 
     #[cfg(feature = "INCLUDE_xTaskAbortDelay")]
-    pub fn set_delay_aborted(&self, next_val: bool) -> bool {
+    pub async fn set_delay_aborted(&self, next_val: bool) -> bool {
         GetTaskControlBlockWrite!(self).set_delay_aborted(next_val)
     }
 
     #[cfg(feature = "configUSE_MUTEXES")]
-    pub fn get_mutex_held_count(&self) -> UBaseType {
+    pub async fn get_mutex_held_count(&self) -> UBaseType {
         GetTaskControlBlockRead!(self).get_mutex_held_count()
     }
 
     #[cfg(feature = "configUSE_MUTEXES")]
-    pub fn set_mutex_held_count(&self, new_count: UBaseType) {
+    pub async fn set_mutex_held_count(&self, new_count: UBaseType) {
         GetTaskControlBlockWrite!(self).set_mutex_held_count(new_count)
     }
 
-    pub fn from_arc(arc: Arc<RwLock<TaskControlBlock>>) -> Self {
+    pub async fn from_arc(arc: Arc<RwLock<TaskControlBlock>>) -> Self {
         TaskHandle(arc)
     }
 
-    pub fn from(tcb: TaskControlBlock) -> Self {
+    pub async fn from(tcb: TaskControlBlock) -> Self {
         TaskHandle(Arc::new(RwLock::new(tcb)))
     }
 
-    pub fn as_raw(self) -> TaskHandleType {
+    pub async fn as_raw(self) -> TaskHandleType {
         Arc::into_raw(self.0) as TaskHandleType
     }
 
-    pub fn get_event_list_item(&self) -> ListItem {
+    pub async fn get_event_list_item(&self) -> ListItem {
         GetTaskControlBlockRead!(self).get_event_list_item()
     }
 
-    pub fn get_state_list_item(&self) -> ListItem {
+    pub async fn get_state_list_item(&self) -> ListItem {
         GetTaskControlBlockRead!(self).get_state_list_item()
     }
 
-    pub fn get_name(&self) -> String {
+    pub async fn get_name(&self) -> String {
         GetTaskControlBlockRead!(self).get_name()
     }
 
-    pub fn get_priority(&self) -> UBaseType {
+    pub async fn get_priority(&self) -> UBaseType {
         GetTaskControlBlockRead!(self).get_priority()
     }
 
-    pub fn set_priority(&self, priority: UBaseType) {
+    pub async fn set_priority(&self, priority: UBaseType) {
         GetTaskControlBlockWrite!(self).set_priority(priority)
     }
 
-    pub fn set_priority_in_detail(&mut self, priority: UBaseType) {
+    pub async fn set_priority_in_detail(&mut self, priority: UBaseType) {
         let mut priority = priority;
         let mut yielding = false;
         let mut current_base_priority: UBaseType = 0;
@@ -465,15 +465,15 @@ impl TaskHandle {
         taskEXIT_CRITICAL!();
     }
 
-    pub fn get_base_priority(&self) -> UBaseType {
+    pub async fn get_base_priority(&self) -> UBaseType {
         GetTaskControlBlockRead!(self).get_base_priority()
     }
 
-    pub fn set_base_priority(&self, priority: UBaseType) {
+    pub async fn set_base_priority(&self, priority: UBaseType) {
         GetTaskControlBlockWrite!(self).set_base_priority(priority)
     }
 
-    pub fn add_task_to_ready_list(&self) -> Result<(), FreeRtosError> {
+    pub async fn add_task_to_ready_list(&self) -> Result<(), FreeRtosError> {
         let tcb = GetTaskControlBlockWrite!(self);
         let priority = self.get_priority();
         traceMOVED_TASK_TO_READY_STATE!(&tcb);
@@ -490,7 +490,7 @@ impl TaskHandle {
         {
             let current_number_of_tasks = get_current_number_of_tasks!() + 1;
             set_current_number_of_tasks!(current_number_of_tasks);
-            if task_global::CURRENT_TCB.read().unwrap().is_none() {
+            if *task_global::CURRENT_TCB.read().await.is_none() {
                 set_current_task_handle!(self.clone());
             }
             else {
@@ -516,7 +516,7 @@ impl TaskHandle {
     }
 }
 
-pub fn add_current_task_to_delayed_list(ticks_to_delay: TickType, can_block_indefinitely: bool) {
+pub async fn add_current_task_to_delayed_list(ticks_to_delay: TickType, can_block_indefinitely: bool) {
     let current_task_handle = get_current_task_handle!();
     {
         #![cfg(feature = "INCLUDE_xTaskAbortDelay")]
@@ -582,7 +582,7 @@ pub fn add_current_task_to_delayed_list(ticks_to_delay: TickType, can_block_inde
     }
 }
 
-pub fn reset_next_task_unblock_time() {
+pub async fn reset_next_task_unblock_time() {
     if list::list_is_empty(&DELAYED_TASK_LIST) {
         // No tasks were blocked, so the next unblock time is set to portMAX_DELAY
         set_next_task_unblock_time!(port::portMAX_DELAY);
@@ -595,7 +595,7 @@ pub fn reset_next_task_unblock_time() {
 }
 
 #[cfg(feature = "INCLUDE_vTaskDelete")]
-pub fn task_delete(task_to_delete: Option<TaskHandle>) {
+pub async fn task_delete(task_to_delete: Option<TaskHandle>) {
     let tcb = GetTaskControlBlockWrite!(task_to_delete);
     
     taskENTER_CRITICAL!();
@@ -639,7 +639,7 @@ pub fn task_delete(task_to_delete: Option<TaskHandle>) {
 }
 
 #[cfg(feature = "INCLUDE_vTaskSuspend")]
-pub fn is_task_suspended(task: &TaskHandle) -> bool {
+pub async fn is_task_suspended(task: &TaskHandle) -> bool {
     let mut result = false;
     let tcb = GetTaskControlBlockRead!(task);
     
@@ -657,7 +657,7 @@ pub fn is_task_suspended(task: &TaskHandle) -> bool {
 }
 
 #[cfg(feature = "INCLUDE_vTaskSuspend")]
-pub fn resume_task(task: TaskHandle) {
+pub async fn resume_task(task: TaskHandle) {
     let mut tcb = GetTaskControlBlockRead!(task);
     
     if task != get_current_task_handle!() {

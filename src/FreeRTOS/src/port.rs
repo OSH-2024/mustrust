@@ -200,7 +200,7 @@ type PointerSizeType = u64;
 
 pub fn port_malloc(size: usize) -> Result<CVoidPointer, FreeRtosError> {
     unsafe {
-        let mut ret_ptr: *mut c_void = core::ptr::null_mut();
+        let mut ret_ptr: *mut cty::c_void = core::ptr::null_mut();
         if size == 0 {
             Err(FreeRtosError::OutOfMemory)
         }
@@ -210,7 +210,7 @@ pub fn port_malloc(size: usize) -> Result<CVoidPointer, FreeRtosError> {
     }
 }
 
-pub fn port_free(pv: *mut ::std::os::raw::c_void) {
+pub fn port_free(pv: *mut cty::c_void) {
     // unsafe { vPortFree(pv) }
 }
 
@@ -247,7 +247,7 @@ pub fn port_end_scheduler() {
 pub fn port_initialize_stack(
     top_of_stack: *mut StackType,
     code: StackType,
-    param_ptr: *mut c_void,
+    param_ptr: *mut cty::c_void,
 ) -> Result<*mut StackType, FreeRtosError> {
     let num: usize = 0;
     let mut ret_val: *mut usize = core::ptr::null_mut();
