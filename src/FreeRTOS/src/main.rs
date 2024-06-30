@@ -8,6 +8,7 @@ mod FreeRTOS_tick_config;
 mod list;
 mod port;
 mod projdefs;
+mod rwlock;
 mod task_global;
 mod tasks;
 mod uart;

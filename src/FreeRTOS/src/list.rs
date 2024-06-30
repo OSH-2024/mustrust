@@ -9,7 +9,8 @@
 
 
 use alloc::sync::{Arc, Weak};
-use synctools::rwlock::*;
+use crate::rwlock::*;
+use core::default::*;
 
 use crate::port::{portMAX_DELAY, TickType, UBaseType};
 use crate::tasks::{TaskControlBlock, TaskHandle};
@@ -256,7 +257,7 @@ impl xLIST {
             .pxIndex
             .upgrade()
             .unwrap_or_else(|| panic!("List item is None"));
-        let owner = Weak::clone(&owned_index.read().owner);
+        let owner = Weak::clone(&(*owned_index.read()).pvOwner);
         owner
     }
 
@@ -265,7 +266,7 @@ impl xLIST {
         let owned_index = list_end
             .upgrade()
             .unwrap_or_else(|| panic!("List item is None"));
-        let owner = Weak::clone(&owned_index.read().owner);
+        let owner = Weak::clone(&(*owned_index.read()).pvOwner);
         owner
     }
     
@@ -295,7 +296,7 @@ fn get_list_item_next(item: &WeakItemLink) -> WeakItemLink {
     let owned_item = item
         .upgrade()
         .unwrap_or_else(|| panic!("List item is None"));
-    let next = Weak::clone(&(**owned_item.read()).pxNext);
+    let next = Weak::clone(&(*owned_item.read()).pxNext);
     next
 }
 

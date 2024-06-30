@@ -2,7 +2,7 @@ use crate::list::ListLink;
 use crate::port::{BaseType, TickType, UBaseType};
 use crate::tasks::*;
 use crate::*;
-use synctools::rwlock::*;
+use crate::rwlock::*;
 use lazy_static::*;
 
 /* Some global variables. */

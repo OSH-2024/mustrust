@@ -5,10 +5,11 @@ use alloc::boxed::*;
 use alloc::sync::{Arc, Weak};
 use core::ops::FnOnce;
 use core::mem;
+use core::default::*;
 use crate::port;
 use crate::task_global::*;
 use cty;
-use synctools::rwlock::*;
+use crate::rwlock::*;
 
 pub type TaskHandleType = *mut cty::c_void;
 
@@ -95,8 +96,8 @@ macro_rules! taskEVENT_LIST_ITEM_VALUE_IN_USE { () => { 0x8000 as u16 } }
 macro_rules! taskEVENT_LIST_ITEM_VALUE_IN_USE { () => { 0x80000000 as u32 } }
 
 pub struct TaskControlBlock {
-    state_list_item: ListItem_t,
-    event_list_item: ListItem_t,
+    state_list_item: ItemLink,
+    event_list_item: ItemLink,
     priority: UBaseType,
     task_name: String,
     stack_pointer: StackType,
@@ -127,8 +128,8 @@ impl PartialEq for TaskControlBlock {
 impl TaskControlBlock {
     pub fn new() -> Self {
         Self {
-            state_list_item: ListItem_t::default(),
-            event_list_item: ListItem_t::default(),
+            state_list_item: Default::default(),
+            event_list_item: Default::default(),
             priority: 1,
             task_name: String::from("New task"),
             stack_pointer: 0,
@@ -154,12 +155,12 @@ impl TaskControlBlock {
         self.task_name.as_str()
     }
 
-    pub fn set_name(&mut self, name: &str) -> Self {
+    pub fn set_name(&mut self, name: &str) -> &mut Self {
         self.task_name = String::from(name);
         self
     }
 
-    pub fn set_stack_length(&mut self, length: UBaseType) -> Self {
+    pub fn set_stack_length(&mut self, length: UBaseType) -> &mut Self {
         self.stack_length = length;
         self
     }
@@ -193,11 +194,11 @@ impl TaskControlBlock {
     }
 
     pub fn get_state_list_item(&self) -> ItemLink {
-        self.state_list_item.clone()
+        Arc::clone(&self.state_list_item)
     }
 
     pub fn get_event_list_item(&self) -> ItemLink {
-        self.event_list_item.clone()
+        Arc::clone(&self.event_list_item)
     }
 
     #[cfg(feature = "configGENERATE_RUN_TIME_STATS")]
@@ -243,7 +244,7 @@ impl TaskControlBlock {
         // Initialize stack
         let px_stack = port::port_malloc(stacksize_as_bytes)?;
         self.stack_pointer = px_stack as *mut StackType;
-        let mut top_of_stack = self.stack_pointer + self.stack_length - 1;
+        let mut top_of_stack = self.stack_pointer + self.stack_length as usize - 1;
         top_of_stack = top_of_stack & portBYTE_ALIGNMENT_MASK as StackType;
         // Initialize task
         let f = Box::new(Box::new(func) as Box<dyn FnOnce()>);
