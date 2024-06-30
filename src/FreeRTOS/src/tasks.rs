@@ -168,7 +168,7 @@ impl TaskControlBlock {
         self.priority.clone()
     }
 
-    pub fn set_priority(mut self, priority: UBaseType) -> Self {
+    pub fn set_priority(&mut self, priority: UBaseType) {
         if priority > configMAX_PRIORITIES!() {
             // Warning: Priority exceeded
             self.priority = configMAX_PRIORITIES!() - 1;
@@ -176,14 +176,13 @@ impl TaskControlBlock {
         else {
             self.priority = priority;
         }
-        self
     }
 
     pub fn get_base_priority(&self) -> UBaseType {
         self.base_priority
     }
 
-    pub fn set_base_priority(mut self, priority: UBaseType) -> Self {
+    pub fn set_base_priority(&mut self, priority: UBaseType) {
         if priority > configMAX_PRIORITIES!() {
             // Warning: Priority exceeded
             self.base_priority = configMAX_PRIORITIES!() - 1;
@@ -191,14 +190,13 @@ impl TaskControlBlock {
         else {
             self.base_priority = priority;
         }
-        self
     }
 
-    pub fn get_state_list_item(&self) -> ListItem_t {
+    pub fn get_state_list_item(&self) -> ItemLink {
         self.state_list_item.clone()
     }
 
-    pub fn get_event_list_item(&self) -> ListItem_t {
+    pub fn get_event_list_item(&self) -> ItemLink {
         self.event_list_item.clone()
     }
 
@@ -246,7 +244,7 @@ impl TaskControlBlock {
         let px_stack = port::port_malloc(stacksize_as_bytes)?;
         self.stack_pointer = px_stack as *mut StackType;
         let mut top_of_stack = self.stack_pointer + self.stack_length - 1;
-        top_of_stack = top_of_stack & portBYTE_ALIGNMENT_MASK as *mut StackType;
+        top_of_stack = top_of_stack & portBYTE_ALIGNMENT_MASK as StackType;
         // Initialize task
         let f = Box::new(Box::new(func) as Box<dyn FnOnce()>);
         let param_ptr = &*f as *const _ as *mut _;
@@ -388,7 +386,7 @@ impl TaskHandle {
     }
 
     pub fn set_priority(&self, priority: UBaseType) {
-        GetTaskControlBlockWrite!(self).set_priority(priority)
+        GetTaskControlBlockWrite!(self).set_priority(priority);
     }
 
     pub fn set_priority_in_detail(&mut self, priority: UBaseType) {
@@ -465,7 +463,7 @@ impl TaskHandle {
     }
 
     pub fn set_base_priority(&self, priority: UBaseType) {
-        GetTaskControlBlockWrite!(self).set_base_priority(priority)
+        GetTaskControlBlockWrite!(self).set_base_priority(priority);
     }
 
     pub fn add_task_to_ready_list(&self) -> Result<(), FreeRtosError> {
@@ -485,7 +483,7 @@ impl TaskHandle {
         {
             let current_number_of_tasks = get_current_number_of_tasks!() + 1;
             set_current_number_of_tasks!(current_number_of_tasks);
-            if *task_global::CURRENT_TCB.read().is_none() {
+            if task_global::CURRENT_TCB.read().is_none() {
                 set_current_task_handle!(self.clone());
             }
             else {
@@ -590,7 +588,7 @@ pub fn reset_next_task_unblock_time() {
 }
 
 #[cfg(feature = "INCLUDE_vTaskDelete")]
-pub fn task_delete(task_to_delete: Option<TaskHandle>) {
+pub fn task_delete(task_to_delete: TaskHandle) {
     let tcb = GetTaskControlBlockWrite!(task_to_delete);
     
     taskENTER_CRITICAL!();
@@ -601,17 +599,17 @@ pub fn task_delete(task_to_delete: Option<TaskHandle>) {
             portRESET_READY_PRIORITY!(tcb.get_priority(), get_priority!());
         }
 
-        if list::get_list_item_container(tcb.get_event_list_item()).is_some() {
+        if list::get_list_item_container(&tcb.get_event_list_item()).is_some() {
             // Reset the event list item
             list::list_remove(tcb.get_event_list_item());
         }
 
         set_task_number!(get_task_number!() + 1);
 
-        if tcb == get_current_task_handle!() {
+        if *tcb == *GetTaskControlBlockRead!(&get_current_task_handle!()) {
             // If the task being deleted is the currently running task then
             // insert it end of the waiting termination list
-            list::list_insert_end(&TASKS_WAITING_TERMINATION, tcb.get_state_list_item());
+            list::list_insert_end(&TASKS_WAITING_TERMINATION, &tcb.get_state_list_item());
 
             // Add the number of deleted tasks waiting to be cleaned up
             set_deleted_tasks_waiting_clean_up!(get_deleted_tasks_waiting_clean_up!() + 1);
@@ -623,7 +621,7 @@ pub fn task_delete(task_to_delete: Option<TaskHandle>) {
             set_current_number_of_tasks!(get_current_number_of_tasks!() - 1);
 
             // Release the task's memory
-            let stack_pointer = GetTaskControlBlockRead!(tcb).stack_pointer;
+            let stack_pointer = tcb.stack_pointer;
             port::port_free(stack_pointer as *mut _);
 
             // Reset the next unblock time
@@ -636,14 +634,14 @@ pub fn task_delete(task_to_delete: Option<TaskHandle>) {
 #[cfg(feature = "INCLUDE_vTaskSuspend")]
 pub fn is_task_suspended(task: &TaskHandle) -> bool {
     let mut result = false;
-    let tcb = *GetTaskControlBlockRead!(task);
+    let tcb = GetTaskControlBlockRead!(task);
     
     // Check if the task is in the suspended list
     if list::is_contained_within(&SUSPENDED_TASK_LIST, &tcb.get_state_list_item()) {
         // The task is in the pending ready list
         if !list::is_contained_within(&PENDING_READY_LIST, &tcb.get_event_list_item()) {
             // The task is not waiting for an event
-            if list::get_list_item_container(tcb.get_event_list_item()).is_some() {
+            if list::get_list_item_container(&tcb.get_event_list_item()).is_some() {
                 result = true;
             }
         }

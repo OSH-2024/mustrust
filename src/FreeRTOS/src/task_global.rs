@@ -312,7 +312,7 @@ macro_rules! get_current_task_handle_wrapped {
 #[macro_export]
 macro_rules! get_current_task_handle {
     () => {
-        crate::task_global::CURRENT_TCB.read().as_ref().clone().expect("No current TCB")
+        *crate::task_global::CURRENT_TCB.read().as_ref().clone().expect("No current TCB")
     };
 }
 
@@ -320,7 +320,7 @@ macro_rules! get_current_task_handle {
 macro_rules! set_current_task_handle {
     ($cloned_new_task: expr) => {
         // info!("CURRENT_TCB changed!");
-        **(crate::task_global::CURRENT_TCB).write() = Some($cloned_new_task)
+        *(crate::task_global::CURRENT_TCB).write() = Some($cloned_new_task)
     };
 }
 
