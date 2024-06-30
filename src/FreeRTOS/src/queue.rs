@@ -5,6 +5,9 @@ use crate::queue_h::*;
 use crate::*;
 use crate::task_queue::*;
 
+use heapless::Deque; // 引入Deque
+use heapless::consts::*; // 引入用于定义容量的类型
+
 pub const queueQUEUE_IS_MUTEX: UBaseType = 0;
 pub const queueUNLOCKED: i8 = -1;
 pub const queueLOCKED_UNMODIFIED: i8 = 0;
