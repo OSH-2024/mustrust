@@ -4,7 +4,6 @@
 #![feature(core_intrinsics)]
 
 mod bindings;
-// mod FreeRTOSConfig;
 mod FreeRTOS_tick_config;
 mod list;
 mod port;

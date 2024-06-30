@@ -1,9 +1,10 @@
+use crate::*;
 use crate::list::*;
 use alloc::sync::{Arc, Weak};
 use core::ops::FnOnce;
 use core::mem;
 use crate::port;
-use crate::task_global;
+use crate::task_global::*;
 use cty;
 use no_std_async::RwLock;
 
@@ -505,7 +506,7 @@ impl TaskHandle {
             self.add_task_to_ready_list();
         }
         taskEXIT_CRITICAL!();
-        if GetSchedulerRunning!() {
+        if get_scheduler_running!() {
             let current_priority = get_current_task_priority!();
             if current_priority < tcb.priority {
                 taskYIELD_IF_USING_PREEMPTION!();
@@ -551,8 +552,8 @@ pub fn add_current_task_to_delayed_list(ticks_to_delay: TickType, can_block_inde
                 list::vListInsert(&DELAYED_TASK_LIST, &current_state_list_item);
 
                 // Next task unblock time should be updated
-                if time < get_next_unblock_time!() {
-                    set_next_unblock_time!(time);
+                if time < get_next_task_unblock_time!() {
+                    set_next_task_unblock_time!(time);
                 }
             }
         }
@@ -574,8 +575,8 @@ pub fn add_current_task_to_delayed_list(ticks_to_delay: TickType, can_block_inde
             list::vListInsert(&DELAYED_TASK_LIST, &current_state_list_item);
 
             // Next task unblock time should be updated
-            if time < get_next_unblock_time!() {
-                set_next_unblock_time!(time);
+            if time < get_next_task_unblock_time!() {
+                set_next_task_unblock_time!(time);
             }
         }
     }
@@ -584,12 +585,12 @@ pub fn add_current_task_to_delayed_list(ticks_to_delay: TickType, can_block_inde
 pub fn reset_next_task_unblock_time() {
     if list::list_is_empty(&DELAYED_TASK_LIST) {
         // No tasks were blocked, so the next unblock time is set to portMAX_DELAY
-        set_next_unblock_time!(port::portMAX_DELAY);
+        set_next_task_unblock_time!(port::portMAX_DELAY);
     }
     else {
         // Get the handle of the first entry in the delayed task list
         let mut temp = get_owner_of_head_entry(&DELAYED_TASK_LIST);
-        set_next_unblock_time!(list::listGET_LIST_ITEM_VALUE(&temp.get_state_list_item()));
+        set_next_task_unblock_time!(list::listGET_LIST_ITEM_VALUE(&temp.get_state_list_item()));
     }
 }
 
@@ -620,7 +621,7 @@ pub fn task_delete(task_to_delete: Option<TaskHandle>) {
             // Add the number of deleted tasks waiting to be cleaned up
             set_deleted_tasks_waiting_clean_up!(get_deleted_tasks_waiting_clean_up!() + 1);
 
-            portPRE_TASK_DELETE_HOOK!();
+            portPRE_TASK_DELETE_HOOK!(tcb, get_yield_pending!());
         }
         else {
             // Decrease the number of tasks

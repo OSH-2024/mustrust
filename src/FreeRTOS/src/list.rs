@@ -167,7 +167,7 @@ impl xLIST {
             insertion position. */
             let next = get_list_item_next(&iterator);
             let value = get_weak_item_value(&next);
-            println!("value: {}", value);
+            // println!("value: {}", value);
             if value == portMAX_DELAY {
                 break;
             }
@@ -176,7 +176,7 @@ impl xLIST {
     }
 
     fn insert(&mut self, item_link: WeakItemLink) {
-        println!("in");
+        // println!("in");
         let value_of_insertion = get_weak_item_value(&item_link);
         /* Insert the new list item into the list, sorted in xItemValue order.
 
@@ -408,7 +408,7 @@ pub fn list_insert(list: &ListLink, item_link: &ItemLink) {
     /* Remember which list the item is in.  This allows fast removal of the
     item later. */
     item_link.write().unwrap().set_container(&list);
-    println!("Set conatiner");
+    // println!("Set conatiner");
     list.write().unwrap().insert(Arc::downgrade(&item_link))
 }
 

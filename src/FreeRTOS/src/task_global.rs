@@ -1,8 +1,9 @@
 use crate::list::ListLink;
 use crate::port::{BaseType, TickType, UBaseType};
-use crate::task_control::TaskHandle;
+use crate::tasks::*;
 use crate::*;
 use no_std_async::rwlock::RwLock;
+use lazy_static::*;
 
 /* Some global variables. */
 pub static mut TICK_COUNT: TickType = 0;
