@@ -8,9 +8,13 @@ mod FreeRTOS_tick_config;
 mod list;
 mod port;
 mod projdefs;
+mod queue;
+mod queue_api;
+mod queue_h;
 mod rwlock;
 mod task_global;
 mod tasks;
+mod trace;
 mod uart;
 
 extern crate alloc;

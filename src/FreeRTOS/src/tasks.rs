@@ -249,7 +249,7 @@ impl TaskControlBlock {
         // Initialize task
         let f = Box::new(Box::new(func) as Box<dyn FnOnce()>);
         let param_ptr = &*f as *const _ as *mut _;
-        let result = port::port_initialise_stack(top_of_stack as *mut _, 32, param_ptr);
+        let result = port::port_initialize_stack(top_of_stack as *mut _, 32, param_ptr);
         match result {
             Ok(_) => core::mem::forget(f),
             Err(e) => return Err(e),

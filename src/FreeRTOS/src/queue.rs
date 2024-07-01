@@ -1,12 +1,16 @@
-use std::collections::VecDeque;
+use alloc::collections::VecDeque;
 use crate::port::*;
 use crate::list::*;
 use crate::queue_h::*;
 use crate::*;
+use crate::tasks::*;
 use crate::task_queue::*;
 
+use core::mem;
+use alloc::boxed::*;
+
 use heapless::Deque; // 引入Deque
-use heapless::consts::*; // 引入用于定义容量的类型
+// use heapless::consts::*; // 引入用于定义容量的类型
 
 pub const queueQUEUE_IS_MUTEX: UBaseType = 0;
 pub const queueUNLOCKED: i8 = -1;
@@ -92,7 +96,7 @@ where
             self.cTxLock = queueUNLOCKED;
             self.pcQueue.clear(); //初始化空队列
             if xNewQueue == false {
-                if list::list_is_empty(&self.xTasksWaitingToSend) == false {
+                if list::listLIST_IS_EMPTY(&self.xTasksWaitingToSend) == false {
                     if task_queue::task_remove_from_event_list(&self.xTasksWaitingToSend) != false {
                         queueYIELD_IF_USING_PREEMPTION!();
                     } else {
@@ -128,7 +132,7 @@ where
             !((kernel::task_get_scheduler_state() == SchedulerState::Suspended)
                 && (xTicksToWait != 0))
         );
-        trace!("Enter function queue_generic_send! TicksToWait: {}, uxMessageWaiting: {}, xCopyPosition: {}", xTicksToWait ,self.uxMessagesWaiting, xCopyPosition);
+        // // trace!("Enter function queue_generic_send! TicksToWait: {}, uxMessageWaiting: {}, xCopyPosition: {}", xTicksToWait ,self.uxMessagesWaiting, xCopyPosition);
         /* This function relaxes the coding standard somewhat to allow return
         statements within the function itself.  This is done in the interest
         of execution time efficiency. */
@@ -142,7 +146,7 @@ where
                 if self.uxMessagesWaiting < self.uxLength || xCopyPosition == queueOVERWRITE {
                     traceQUEUE_SEND!(&self);
                     self.copy_data_to_queue(pvItemToQueue, xCopyPosition);
-                    trace!("Queue can be sent");
+                    // trace!("Queue can be sent");
 
                     /* The queue is a member of a queue set, and posting
                     to the queue set caused a higher priority task to
@@ -157,7 +161,7 @@ where
                             }
                         }
                         None => {
-                            if list::list_is_empty(&self.xTasksWaitingToReceive) == false {
+                            if list::listLIST_IS_EMPTY(&self.xTasksWaitingToReceive) == false {
                                 if task_queue::task_remove_from_event_list(
                                     &self.xTasksWaitingToReceive,
                                 ) {
@@ -173,7 +177,7 @@ where
                         /* If there was a task waiting for data to arrive on the
                         queue then unblock it now. */
                         #![cfg(not(feature = "configUSE_QUEUE_SETS"))]
-                        if !list::list_is_empty(&self.xTasksWaitingToReceive) {
+                        if !list::listLIST_IS_EMPTY(&self.xTasksWaitingToReceive) {
                             if task_queue::task_remove_from_event_list(&self.xTasksWaitingToReceive)
                             {
                                 /* The unblocked task has a priority higher than
@@ -198,7 +202,7 @@ where
                             taskENTER_CRITICAL!();
                             {
                                 let task_handle = self.transed_task_handle_for_mutex();
-                                task_queue::task_priority_inherit(task_handle);
+                                tasks::task_priority_inherit(task_handle);
                             }
                             taskEXIT_CRITICAL!();
                         }
@@ -213,7 +217,7 @@ where
                         /* Return to the original privilege level before exiting
                         the function. */
                         traceQUEUE_SEND_FAILED!(&self);
-                        trace!("Queue Send: QueueFull");
+                        // trace!("Queue Send: QueueFull");
                         return Err(QueueError::QueueFull);
                     } else if !xEntryTimeSet {
                         /* The queue was full and a block time was specified so
@@ -237,7 +241,7 @@ where
             if !task_queue::task_check_for_timeout(&mut xTimeOut, &mut xTicksToWait) {
                 if self.is_queue_full() {
                     traceBLOCKING_ON_QUEUE_SEND!(&self);
-                    trace!("queue_generic_send place on event list");
+                    // trace!("queue_generic_send place on event list");
                     task_queue::task_place_on_event_list(&self.xTasksWaitingToSend, xTicksToWait);
 
                     /* Unlocking the queue means queue events can effect the
@@ -301,7 +305,7 @@ where
                             }
                         }
                         None => {
-                            if list::list_is_empty(&self.xTasksWaitingToReceive) == false {
+                            if list::listLIST_IS_EMPTY(&self.xTasksWaitingToReceive) == false {
                                 if task_queue::task_remove_from_event_list(
                                     &self.xTasksWaitingToReceive,
                                 ) != false
@@ -318,7 +322,7 @@ where
 
                     {
                         #![cfg(not(feature = "configUSE_QUEUE_SETS"))]
-                        if list::list_is_empty(&self.xTasksWaitingToReceive) == false {
+                        if list::listLIST_IS_EMPTY(&self.xTasksWaitingToReceive) == false {
                             if task_queue::task_remove_from_event_list(&self.xTasksWaitingToReceive)
                                 != false
                             {
@@ -374,7 +378,7 @@ where
                         }
                     }
                     None => {
-                        if list::list_is_empty(&self.xTasksWaitingToReceive) == false {
+                        if list::listLIST_IS_EMPTY(&self.xTasksWaitingToReceive) == false {
                             if task_queue::task_remove_from_event_list(&self.xTasksWaitingToReceive)
                                 != false
                             {
@@ -389,7 +393,7 @@ where
                 }
                 {
                     #![cfg(not(feature = "configUSE_QUEUE_SETS"))]
-                    if list::list_is_empty(&self.xTasksWaitingToReceive) == false {
+                    if list::listLIST_IS_EMPTY(&self.xTasksWaitingToReceive) == false {
                         if task_queue::task_remove_from_event_list(&self.xTasksWaitingToReceive)
                             != false
                         {
@@ -412,7 +416,7 @@ where
         {
             let mut cRxLock: i8 = self.cRxLock;
             while cRxLock > queueLOCKED_UNMODIFIED {
-                if list::list_is_empty(&self.xTasksWaitingToReceive) == false {
+                if list::listLIST_IS_EMPTY(&self.xTasksWaitingToReceive) == false {
                     if task_queue::task_remove_from_event_list(&self.xTasksWaitingToReceive)
                         != false
                     {
@@ -451,18 +455,18 @@ where
 	statements within the function itself.  This is done in the interest
 	of execution time efficiency. */
         loop {
-            trace!(
-                "Enter function queue_generic_receive, TicksToWait:{}, Peeking: {}!",
-                xTicksToWait,
-                xJustPeeking
-            );
+            // trace!(
+            //     "Enter function queue_generic_receive, TicksToWait:{}, Peeking: {}!",
+            //     xTicksToWait,
+            //     xJustPeeking
+            // );
             taskENTER_CRITICAL!();
             {
                 let uxMessagesWaiting: UBaseType = self.uxMessagesWaiting;
-                trace!(
-                    "queue_generic_receive: uxMessageWaiting: {}",
-                    uxMessagesWaiting
-                );
+                // trace!(
+                //     "queue_generic_receive: uxMessageWaiting: {}",
+                //     uxMessagesWaiting
+                // );
                 /* Is there data in the queue now?  To be running the calling task
                 must be the highest priority task wanting to access the queue. */
                 if uxMessagesWaiting > 0 as UBaseType {
@@ -482,20 +486,20 @@ where
                                 || self.ucQueueType == QueueType::RecursiveMutex
                             {
                                 let task_handle = self.transed_task_handle_for_mutex();
-                                xYieldRequired = task_queue::task_priority_disinherit(task_handle);
+                                xYieldRequired = tasks::task_priority_disinherit(task_handle);
                                 self.pcQueue.pop_front();
                             } else {
                                 mtCOVERAGE_TEST_MARKER!();
                             }
                         }
-                        trace!("queue_generic_receive -- line 498");
-                        if list::list_is_empty(&self.xTasksWaitingToSend) == false {
+                        // trace!("queue_generic_receive -- line 498");
+                        if list::listLIST_IS_EMPTY(&self.xTasksWaitingToSend) == false {
                             if task_queue::task_remove_from_event_list(&self.xTasksWaitingToSend)
                                 != false
                             {
                                 queueYIELD_IF_USING_PREEMPTION!();
                             } else {
-                                trace!("queue_generic_receive -- line 504");
+                                // trace!("queue_generic_receive -- line 504");
                                 mtCOVERAGE_TEST_MARKER!();
                             }
                         } else if xYieldRequired == true {
@@ -505,7 +509,7 @@ where
                              * different to that in which they were taken. */
                             queueYIELD_IF_USING_PREEMPTION!();
                         } else {
-                            trace!("queue_generic_receive -- line 508");
+                            // trace!("queue_generic_receive -- line 508");
                             mtCOVERAGE_TEST_MARKER!();
                         }
                     } else {
@@ -515,7 +519,7 @@ where
                         self.QueueUnion = pcOriginalReadPosition; //QueueUnnion represents pcReadFrom
                         /* The data is being left in the queue, so see if there are
                            any other tasks waiting for the data. */
-                        if list::list_is_empty(&self.xTasksWaitingToReceive) != false {
+                        if list::listLIST_IS_EMPTY(&self.xTasksWaitingToReceive) != false {
                             if task_queue::task_remove_from_event_list(&self.xTasksWaitingToReceive)
                                 != false
                             {
@@ -528,7 +532,7 @@ where
                         }
                     }
                     taskEXIT_CRITICAL!();
-                    trace!("queue_generic_receive -- line 529");
+                    // trace!("queue_generic_receive -- line 529");
                     return Ok(buffer.unwrap_or_else(|| panic!("buffer is empty!")));
                 } else {
                     if xTicksToWait == 0 as TickType {
@@ -549,10 +553,10 @@ where
                 }
             }
             taskEXIT_CRITICAL!();
-            trace!("queue_generic_receive -- line 553");
+            // trace!("queue_generic_receive -- line 553");
             kernel::task_suspend_all();
             self.lock_queue();
-            trace!("queue_generic_receive -- line 556");
+            // trace!("queue_generic_receive -- line 556");
             /* Update the timeout state to see if it has expired yet. */
             if task_queue::task_check_for_timeout(&mut xTimeOut, &mut xTicksToWait) == false {
                 if self.is_queue_empty() != false {
@@ -571,7 +575,7 @@ where
                     self.unlock_queue();
                     kernel::task_resume_all();
                 }
-                trace!("queue_generic_receive -- line 589");
+                // trace!("queue_generic_receive -- line 589");
             } else {
                 self.unlock_queue();
                 kernel::task_resume_all();
@@ -717,16 +721,16 @@ where
         unimplemented!();
     }
 
-    pub fn transed_task_handle_for_mutex(&self) -> Option<task_control::TaskHandle> {
+    pub fn transed_task_handle_for_mutex(&self) -> Option<tasks::TaskHandle> {
         if self.pcQueue.get(0).cloned().is_some() {
             let untransed_task_handle = self.pcQueue.get(0).cloned().unwrap();
-            trace!("successfully get the task handle");
+            // trace!("successfully get the task handle");
             let untransed_task_handle = Box::new(untransed_task_handle);
-            let mut task_handle: Option<task_control::TaskHandle>;
+            let mut task_handle: Option<tasks::TaskHandle>;
             unsafe {
-                let transed_task_handle = std::mem::transmute::<
+                let transed_task_handle = core::mem::transmute::<
                     Box<T>,
-                    Box<Option<task_control::TaskHandle>>,
+                    Box<Option<tasks::TaskHandle>>,
                 >(untransed_task_handle);
                 task_handle = *transed_task_handle
             }
@@ -738,13 +742,13 @@ where
     }
 }
 
-fn transed_task_handle_to_T<T>(task_handle: Option<task_control::TaskHandle>) -> T {
+fn transed_task_handle_to_T<T>(task_handle: Option<tasks::TaskHandle>) -> T {
     /* use unsafe to transmute Option<TaskHandle> to T type*/
     let mut T_type: T;
     let task_handle = Box::new(task_handle);
     unsafe {
         let transed_T =
-            std::mem::transmute::<Box<Option<task_control::TaskHandle>>, Box<T>>(task_handle);
+            core::mem::transmute::<Box<Option<tasks::TaskHandle>>, Box<T>>(task_handle);
         T_type = *transed_T;
     }
     T_type
