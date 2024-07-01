@@ -97,10 +97,10 @@ pub fn task_start_scheduler() {
 }
 
 pub fn create_idle_task() -> TaskHandle {
-    println!("number: {}", get_current_number_of_tasks!());
+    // println!("number: {}", get_current_number_of_tasks!());
     let idle_task_fn = || {
         loop {
-            trace!("Idle Task running");
+            // trace!("Idle Task running");
             check_tasks_waiting_termination();
 
             #[cfg(not(feature = "configUSE_PREEMPTION"))]
@@ -117,7 +117,7 @@ pub fn create_idle_task() -> TaskHandle {
 
             {
                 #![cfg(feature = "configUSE_IDLE_HOOK")]
-                trace!("Idle Task running");
+                // trace!("Idle Task running");
             }
         }
     };
@@ -131,6 +131,15 @@ pub fn create_idle_task() -> TaskHandle {
 
 fn check_tasks_waiting_termination() {
     // TODO: Wait for task_delete.
+    // 遍历所有任务，检查状态并处理待删除的任务
+    for task in all_tasks.iter() {
+        if task.is_waiting_for_termination() {
+            // 执行任务删除前的清理工作
+            task.cleanup();
+            // 从任务列表中移除
+            all_tasks.remove(task);
+        }
+    }
 }
 
 /// The second (optional) part of task_start_scheduler(),
@@ -139,6 +148,22 @@ fn create_timer_task() {
     // TODO: This function relies on the software timer, which we may not implement.
     // timer::create_timer_task()
     // On fail, panic!("No enough heap space to allocate timer task.");
+    // 创建一个定时器任务，周期性执行某些操作
+    let timer_task_fn = || loop {
+        // 定时器任务的执行逻辑
+        handle_timer_events();
+        // 让出CPU，等待下一个周期
+        taskYIELD!();
+    };
+
+    // 尝试创建定时器任务，设置优先级、名称等
+    match TCB::new()
+        .priority(1) // 定时器任务通常优先级较低
+        .name("Timer")
+        .initialise(timer_task_fn) {
+        Ok(_) => {},//println!("Timer task created successfully."),
+        Err(err) => panic!("Failed to create timer task: {:?}", err),
+    }
 }
 
 /// The third part of task_step_scheduler, do some initialziation
@@ -158,6 +183,7 @@ fn initialize_scheduler() {
     } else {
         // TODO: Maybe a trace here?
         /* Should only reach here if a task calls xTaskEndScheduler(). */
+        //trace!("Scheduler failed to start.");
     }
 }
 
@@ -175,7 +201,7 @@ pub fn task_suspend_all() {
 
 
 pub fn task_resume_all() -> bool {
-    trace!("resume_all called!");
+    // trace!("resume_all called!");
     let mut already_yielded = false;
 
     // TODO: This is a recoverable error, use Result<> instead.
@@ -188,16 +214,16 @@ pub fn task_resume_all() -> bool {
     taskENTER_CRITICAL!();
     {
         set_scheduler_suspended!(get_scheduler_suspended!() - 1);
-        println!(
+        /*println!(
             "get_current_number_of_tasks: {}",
             get_current_number_of_tasks!()
-        );
+        );*/
         if get_scheduler_suspended!() == pdFALSE as UBaseType {
             if get_current_number_of_tasks!() > 0 {
-                trace!(
+                /*trace!(
                     "Current number of tasks is: {}, move tasks to ready list.",
                     get_current_number_of_tasks!()
-                );
+                );*/
                 if move_tasks_to_ready_list() {
                     reset_next_task_unblock_time();
                 }
@@ -220,14 +246,14 @@ pub fn task_resume_all() -> bool {
         }
     }
 
-    trace!("Already yielded is {}", already_yielded);
+    // trace!("Already yielded is {}", already_yielded);
     already_yielded
 }
 
 fn move_tasks_to_ready_list() -> bool {
     let mut has_unblocked_task = false;
     while !list::list_is_empty(&PENDING_READY_LIST) {
-        trace!("PEDING_LIST not empty");
+        // trace!("PEDING_LIST not empty");
         has_unblocked_task = true;
         let task_handle = list::get_owner_of_head_entry(&PENDING_READY_LIST);
         let event_list_item = task_handle.get_event_list_item();
@@ -259,7 +285,7 @@ fn reset_next_task_unblock_time() {
 }
 
 fn process_pended_ticks() {
-    trace!("Processing pended ticks");
+    // trace!("Processing pended ticks");
     let mut pended_counts = get_pended_ticks!();
 
     if pended_counts > 0 {
@@ -328,7 +354,7 @@ fn task_select_highest_priority_task() {
 
     let next_task = list::get_owner_of_next_entry(&READY_TASK_LISTS[top_priority as usize]);
 
-    trace!("Next task is {}", next_task.get_name());
+    // trace!("Next task is {}", next_task.get_name());
     set_current_task_handle!(next_task);
 
     set_top_ready_priority!(top_priority);
@@ -337,7 +363,7 @@ fn task_select_highest_priority_task() {
 #[cfg(feature = "configGENERATE_RUN_TIME_STATS")]
 fn generate_context_switch_stats() {
     let total_run_time = portGET_RUN_TIME_COUNTER_VALUE!() as u32;
-    trace!("Total runtime: {}", total_run_time);
+    // trace!("Total runtime: {}", total_run_time);
     set_total_run_time!(total_run_time);
 
     let task_switched_in_time = get_task_switch_in_time!();
@@ -357,7 +383,7 @@ pub fn task_increment_tick() -> bool {
 
     traceTASK_INCREMENT_TICK!(get_tick_count!());
 
-    trace!("SCHEDULER_SUSP is {}", get_scheduler_suspended!());
+    // trace!("SCHEDULER_SUSP is {}", get_scheduler_suspended!());
     if get_scheduler_suspended!() == pdFALSE as UBaseType {
         let const_tick_count = get_tick_count!() + 1;
 
@@ -370,7 +396,7 @@ pub fn task_increment_tick() -> bool {
         }
 
         if const_tick_count >= get_next_task_unblock_time!() {
-            trace!("UNBLOCKING!");
+            // trace!("UNBLOCKING!");
             loop {
                 if list::list_is_empty(&DELAYED_TASK_LIST) {
                     set_next_task_unblock_time!(port::portMAX_DELAY);
