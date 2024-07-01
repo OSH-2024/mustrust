@@ -99,3 +99,22 @@ pub fn task_check_for_timeout(timeout: &mut time_out, ticks_to_wait: &mut TickTy
     taskEXIT_CRITICAL!();
     ret
 }
+
+pub fn task_place_on_event_list(event_list: &ListLink, ticks_to_wait: TickType) {
+    let unwrapped_cur = get_current_task_handle!();
+    list::list_insert(event_list, unwrapped_cur.get_event_list_item());
+    add_current_task_to_delayed_list(ticks_to_wait, true);
+}
+
+#[cfg(feature = "configUSE_MUTEXES")]
+pub fn task_increment_mutex_held_count() -> Option<TaskHandle> {
+    match get_current_task_handle_wrapped!() {
+        Some(task) => {
+            let new_val = task.get_mutex_held_count() + 1;
+            task.set_mutex_held_count(new_val);
+            Some(task.clone())
+        }
+        None => None,
+    }
+}
+
