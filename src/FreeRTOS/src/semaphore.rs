@@ -33,9 +33,9 @@ impl Semaphore {
 
     pub fn semaphore_up(&self) -> Result<Option<TaskHandle>, QueueError> {
         unsafe {
-            trace!("Semaphore up runs!");
+            // trace!("Semaphore up runs!");
             let inner = self.0.get();
-            trace!("Semaphore up get finished!");
+            // trace!("Semaphore up get finished!");
             (*inner).queue_generic_receive(semGIVE_BLOCK_TIME, false)
         }
     }
@@ -103,19 +103,19 @@ impl Semaphore {
         unsafe {
             let inner = self.0.get();
             traceTAKE_MUTEX_RECURSIVE!(*inner);
-            trace!("Ready to get recursive mutex holder");
+            // trace!("Ready to get recursive mutex holder");
             let mutex_holder = (*inner).transed_task_handle_for_mutex();
-            trace!("Get recursive mutex holder successfully");
+            // trace!("Get recursive mutex holder successfully");
             if mutex_holder.is_some()
             {
                 if mutex_holder.unwrap().clone() == get_current_task_handle!() {
-                    trace!("Not First Time get this mutex");
+                    // trace!("Not First Time get this mutex");
                     (*inner).QueueUnion_increase();
                     xReturn = false;
                 }
             } 
             // else {
-                trace!("First Time get this mutex");
+                // trace!("First Time get this mutex");
                 match (*inner).queue_generic_send(None, ticks_to_wait, queueSEND_TO_BACK) {
                     Ok(x) => {
                         (*inner).QueueUnion_increase();
