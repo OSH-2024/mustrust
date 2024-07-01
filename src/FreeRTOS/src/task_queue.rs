@@ -156,3 +156,45 @@ pub fn task_priority_inherit(mutex_holder: Option<TaskHandle>) {
         mtCOVERAGE_TEST_MARKER!()
     }
 }
+
+#[cfg(feature = "configUSE_MUTEXES")]
+pub fn task_priority_disinherit(mutex_holder: Option<TaskHandle>) -> bool {
+    let mut ret: bool = false;
+
+    if let Some(task) = mutex_holder {
+        let mutex_held = task.get_mutex_held_count();
+        let mutex_held = mutex_held - 1;
+        task.set_mutex_held_count(mutex_held);
+
+        let this_task_priority = task.get_priority();
+        let this_task_base_priority = task.get_base_priority();
+        if this_task_priority != this_task_base_priority {
+            if mutex_held == 0 {
+                let state_list_item = task.get_state_list_item();
+                if list::list_remove(state_list_item) == 0 {
+                    taskRESET_READY_PRIORITY!(this_task_priority);
+                } else {
+                    mtCOVERAGE_TEST_MARKER!();
+                }
+                traceTASK_PRIORITY_DISINHERIT!(&task, this_task_base_priority);
+                task.set_priority(this_task_base_priority);
+
+                let new_item_val = (configMAX_PRIORITIES!() - this_task_priority) as TickType;
+                list::listSET_LIST_ITEM_VALUE(&task.get_event_list_item(), new_item_val);
+                task.add_task_to_ready_list().unwrap();
+
+                ret = true;
+            }
+            else {
+                mtCOVERAGE_TEST_MARKER!();
+            }
+        }
+        else {
+            mtCOVERAGE_TEST_MARKER!();
+        }
+    }
+    else {
+        mtCOVERAGE_TEST_MARKER!();
+    }
+    ret
+}
