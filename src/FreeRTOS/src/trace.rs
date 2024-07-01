@@ -61,6 +61,7 @@ macro_rules! traceTASK_PRIORITY_INHERIT {
     ($pxTCBOfMutexHolder: expr, $uxInheritedPriority: expr) => {};
 }
 
+#[macro_export]
 macro_rules! traceTASK_PRIORITY_DISINHERIT {
     ($pxTCBOfMutexHolder: expr, $uxOriginalPriority: expr) => {};
 }

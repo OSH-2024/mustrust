@@ -39,19 +39,16 @@ macro_rules! portYIELD_FROM_ISR {
     }
 }
 
-#[macro_export]
-macro_rules! portSET_INTERRUPT_MASK_FROM_ISR {
-    () => {
-        port_initialize_blocks();
-        // unsafe { (crate::bindings::xPortSetInterruptMask() as BaseType) }
-    };
+pub fn portSET_INTERRUPT_MASK_FROM_ISR() -> BaseType {
+    port_initialize_blocks();
+    unsafe { crate::bindings::xPortSetInterruptMask() as BaseType }
 }
 
 #[macro_export]
 macro_rules! portCLEAR_INTERRUPT_MASK_FROM_ISR {
     ($xMask: expr) => {
         // unsafe { crate::bindings::vPortClearInterruptMask($xMask as BaseType) }
-    };
+    }
 }
 
 #[macro_export]

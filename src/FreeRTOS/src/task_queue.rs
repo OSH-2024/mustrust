@@ -2,9 +2,9 @@ use crate::list;
 use crate::list::ListLink;
 use crate::port::*;
 use crate::kernel::*;
-use crate::projdefs::pdFALSE;
 use crate::tasks::*;
-use crate::global::*;
+use crate::task_global::*;
+use crate::trace::*;
 use crate::*;
 use core::default::*;
 
@@ -22,7 +22,7 @@ pub fn task_remove_from_event_list(event_list: &ListLink) -> bool {
         unblocked_tcb.add_task_to_ready_list().unwrap();
     }
     else {
-        list::list_insert_end(&PENDING_READY_LIST, unblocked_tcb.get_event_list_item());
+        list::list_insert_end(&PENDING_READY_LIST, &unblocked_tcb.get_event_list_item());
     }
 
     if unblocked_tcb.get_priority() < get_current_task_priority!() {
@@ -52,7 +52,7 @@ pub struct time_out {
 }
 
 pub fn task_set_timeout_state(timeout: &mut time_out) {
-    timeout.overflow_count = get_number_of_overflows!();
+    timeout.overflow_count = get_num_of_overflows!();
     timeout.time_on_entering = get_tick_count!();
 }
 
@@ -65,12 +65,13 @@ pub fn task_check_for_timeout(timeout: &mut time_out, ticks_to_wait: &mut TickTy
         let mut cfglock1 = false;
         let mut cfglock2 = false;
 
+        #[cfg(feature = "INCLUDE_xTaskAbortDelay")]
         {
-            #[cfg(feature = "INCLUDE_xTaskAbortDelay")]
             cfglock1 = true;
         }
+        
+        #[cfg(feature = "INCLUDE_vTaskSuspend")]
         {
-            #[cfg(feature = "INCLUDE_vTaskSuspend")]
             cfglock2 = true;
         }
 
@@ -78,11 +79,11 @@ pub fn task_check_for_timeout(timeout: &mut time_out, ticks_to_wait: &mut TickTy
             unwrapped_cur.set_delay_aborted(false);
             ret = true;
         }
-        if cfglock2 && *ticks_to_wait == portMAX_DELAY!() {
+        if cfglock2 && *ticks_to_wait == portMAX_DELAY!() as u32 {
             ret = false;
         }
 
-        if get_number_of_overflows!() != timeout.overflow_count
+        if get_num_of_overflows!() != timeout.overflow_count
             && const_tick_count >= timeout.time_on_entering
         {
             ret = true;
@@ -102,7 +103,7 @@ pub fn task_check_for_timeout(timeout: &mut time_out, ticks_to_wait: &mut TickTy
 
 pub fn task_place_on_event_list(event_list: &ListLink, ticks_to_wait: TickType) {
     let unwrapped_cur = get_current_task_handle!();
-    list::list_insert(event_list, unwrapped_cur.get_event_list_item());
+    list::list_insert(event_list, &unwrapped_cur.get_event_list_item());
     add_current_task_to_delayed_list(ticks_to_wait, true);
 }
 
@@ -133,27 +134,27 @@ pub fn task_priority_inherit(mutex_holder: Option<TaskHandle>) {
                 list::listSET_LIST_ITEM_VALUE(&event_list_item, new_item_val);
             }
             else {
-                mtCOVERAGE_TEST_MARKER!()
+                mtCOVERAGE_TEST_MARKER!();
             }
 
             let state_list_item = task.get_state_list_item();
             if list::is_contained_within(&READY_TASK_LISTS[this_task_priority as usize], &state_list_item) {
-                if list::list_remove(&state_list_item) == 0 {
-                    taskRESET_READY_PRIORITY(this_task_priority);
+                if list::list_remove(state_list_item) == 0 {
+                    taskRESET_READY_PRIORITY!(this_task_priority);
                 }
                 else {
-                    mtCOVERAGE_TEST_MARKER!()
+                    mtCOVERAGE_TEST_MARKER!();
                 }
                 task.set_priority(current_task_priority);
                 task.add_task_to_ready_list().unwrap();
             }
         }
         else {
-            mtCOVERAGE_TEST_MARKER!()
+            mtCOVERAGE_TEST_MARKER!();
         }
     }
     else {
-        mtCOVERAGE_TEST_MARKER!()
+        mtCOVERAGE_TEST_MARKER!();
     }
 }
 

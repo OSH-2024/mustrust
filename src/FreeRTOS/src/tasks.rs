@@ -2,6 +2,7 @@ use crate::*;
 use crate::list::*;
 use crate::port::*;
 use alloc::boxed::*;
+use alloc::string::*;
 use alloc::sync::{Arc, Weak};
 use core::ops::FnOnce;
 use core::mem;
@@ -66,21 +67,21 @@ macro_rules! taskRECORD_READY_PRIORITY {
     };
 }
 
-#[cfg(not(feature = "configUSE_PORT_OPTIMISED_TASK_SELECTION"))]
-fn taskSelectHighestPriorityTask() {
-    let mut uxTopPriority: UBaseType = get_top_ready_priority!();
+// #[cfg(not(feature = "configUSE_PORT_OPTIMISED_TASK_SELECTION"))]
+// fn taskSelectHighestPriorityTask() {
+//     let mut uxTopPriority: UBaseType = get_top_ready_priority!();
 
-    /* Find the highest priority queue that contains ready tasks. */
-    while list::listLIST_IS_EMPTY(&READY_TASK_LISTS[uxTopPriority as usize]) {
-        assert!(uxTopPriority > 0, "No non-zero priority task found.");
-        uxTopPriority -= 1;
-    }
+//     /* Find the highest priority queue that contains ready tasks. */
+//     while list::listLIST_IS_EMPTY(&READY_TASK_LISTS[uxTopPriority as usize]) {
+//         assert!(uxTopPriority > 0, "No non-zero priority task found.");
+//         uxTopPriority -= 1;
+//     }
 
-    /* listGET_OWNER_OF_NEXT_ENTRY indexes through the list, so the tasks of
-    the same priority get an equal share of the processor time. */
-    pxCurrentTCB = list::get_owner_of_next_entry(&pxReadyTasksLists[uxTopPriority as usize]);
-    set_top_ready_priority!(uxTopPriority);
-}
+//     /* listGET_OWNER_OF_NEXT_ENTRY indexes through the list, so the tasks of
+//     the same priority get an equal share of the processor time. */
+//     CURRENT_TCB = list::get_owner_of_next_entry(&READY_TASK_LISTS[uxTopPriority as usize]);
+//     set_top_ready_priority!(uxTopPriority);
+// }
 
 #[cfg(not(feature = "configUSE_PORT_OPTIMISED_TASK_SELECTION"))]
 #[macro_export]
@@ -379,7 +380,7 @@ impl TaskHandle {
     }
 
     pub fn get_name(&self) -> String {
-        GetTaskControlBlockRead!(self).get_name()
+        GetTaskControlBlockRead!(self).get_name().to_string()
     }
 
     pub fn get_priority(&self) -> UBaseType {

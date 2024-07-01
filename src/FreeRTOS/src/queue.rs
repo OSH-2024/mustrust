@@ -202,7 +202,7 @@ where
                             taskENTER_CRITICAL!();
                             {
                                 let task_handle = self.transed_task_handle_for_mutex();
-                                tasks::task_priority_inherit(task_handle);
+                                task_queue::task_priority_inherit(task_handle);
                             }
                             taskEXIT_CRITICAL!();
                         }
@@ -222,7 +222,7 @@ where
                     } else if !xEntryTimeSet {
                         /* The queue was full and a block time was specified so
                         configure the timeout structure. */
-                        task_queue::task_set_time_out_state(&mut xTimeOut);
+                        task_queue::task_set_timeout_state(&mut xTimeOut);
                         xEntryTimeSet = true;
                     } else {
                         /* Entry time was already set. */
@@ -287,7 +287,7 @@ where
         let mut pxHigherPriorityTaskWoken: bool = false; //默认为false,下面一些情况改为true
 
         portASSERT_IF_INTERRUPT_PRIORITY_INVALID!();
-        let uxSavedInterruptStatus: UBaseType = portSET_INTERRUPT_MASK_FROM_ISR!() as UBaseType;
+        let uxSavedInterruptStatus: UBaseType = portSET_INTERRUPT_MASK_FROM_ISR() as UBaseType;
         {
             if self.uxMessagesWaiting < self.uxLength || xCopyPosition == queueOVERWRITE {
                 let cTxLock: i8 = self.cTxLock;
@@ -486,7 +486,7 @@ where
                                 || self.ucQueueType == QueueType::RecursiveMutex
                             {
                                 let task_handle = self.transed_task_handle_for_mutex();
-                                xYieldRequired = tasks::task_priority_disinherit(task_handle);
+                                xYieldRequired = task_queue::task_priority_disinherit(task_handle);
                                 self.pcQueue.pop_front();
                             } else {
                                 mtCOVERAGE_TEST_MARKER!();
@@ -544,7 +544,7 @@ where
                     } else if xEntryTimeSet == false {
                         /* The queue was empty and a block time was specified so
                         configure the timeout structure. */
-                        task_queue::task_set_time_out_state(&mut xTimeOut);
+                        task_queue::task_set_timeout_state(&mut xTimeOut);
                         xEntryTimeSet = true;
                     } else {
                         /* Entry time was already set. */
