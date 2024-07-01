@@ -19,7 +19,7 @@ pub fn task_remove_from_event_list(event_list: &ListLink) -> bool {
 
     if get_scheduler_suspended!() == pdFALSE!() {
         list::list_remove(unblocked_tcb.get_state_list_item());
-        unblocked_tcb.add_task_to_ready_list().Unwrap();
+        unblocked_tcb.add_task_to_ready_list().unwrap();
     }
     else {
         list::list_insert_end(&PENDING_READY_LIST, unblocked_tcb.get_event_list_item());
@@ -118,3 +118,41 @@ pub fn task_increment_mutex_held_count() -> Option<TaskHandle> {
     }
 }
 
+#[cfg(feature = "configUSE_MUTEXES")]
+pub fn task_priority_inherit(mutex_holder: Option<TaskHandle>) {
+    if mutex_holder.is_some() {
+        let task = mutex_holder.unwrap();
+        let current_task_priority = get_current_task_priority!();
+        let this_task_priority = task.get_priority();
+
+        if this_task_priority < current_task_priority {
+            let event_list_item = task.get_event_list_item();
+            if (list::listGET_LIST_ITEM_VALUE(&event_list_item) & taskEVENT_LIST_ITEM_VALUE_IN_USE) == 0
+            {
+                let new_item_val = (configMAX_PRIORITIES!() - current_task_priority) as TickType;
+                list::listSET_LIST_ITEM_VALUE(&event_list_item, new_item_val);
+            }
+            else {
+                mtCOVERAGE_TEST_MARKER!()
+            }
+
+            let state_list_item = task.get_state_list_item();
+            if list::is_contained_within(&READY_TASK_LISTS[this_task_priority as usize], &state_list_item) {
+                if list::list_remove(&state_list_item) == 0 {
+                    taskRESET_READY_PRIORITY(this_task_priority);
+                }
+                else {
+                    mtCOVERAGE_TEST_MARKER!()
+                }
+                task.set_priority(current_task_priority);
+                task.add_task_to_ready_list().unwrap();
+            }
+        }
+        else {
+            mtCOVERAGE_TEST_MARKER!()
+        }
+    }
+    else {
+        mtCOVERAGE_TEST_MARKER!()
+    }
+}
