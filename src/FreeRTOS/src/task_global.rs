@@ -349,8 +349,8 @@ macro_rules! taskCHECK_FOR_STACK_OVERFLOW {
 macro_rules! switch_delayed_list {
     () => {
         unsafe {
-            let mut delayed = *DELAYED_TASK_LIST.write();
-            let mut overflowed = *OVERFLOW_DELAYED_TASK_LIST.write();
+            let mut delayed = DELAYED_TASK_LIST.write();
+            let mut overflowed = OVERFLOW_DELAYED_TASK_LIST.write();
             let tmp = (*delayed).clone();
             *delayed = (*overflowed).clone();
             *overflowed = tmp;

@@ -1,11 +1,11 @@
 // kernel.rs, FreeRTOS scheduler control APIs.
 use crate::list;
 use crate::port::UBaseType;
-use crate::projdefs::pdFALSE;
-use crate::task_control::{TaskHandle, TCB};
+use crate::projdefs::*;
+use crate::tasks::{TaskHandle, TaskControlBlock};
 use crate::task_global::*;
 use crate::*; // TODO: Is this line necessary?
-              // use crate::task_control::TCB;
+              // use crate::task_control::TaskControlBlock;
 
 /* Definitions returned by xTaskGetSchedulerState().
  * The originial definitons are C constants, we changed them to enums.
@@ -108,7 +108,7 @@ pub fn create_idle_task() -> TaskHandle {
 
             {
                 #![cfg(all(feature = "configUSE_PREEMPTION", feature = "configIDLE_SHOULD_YIELD"))]
-                if list::current_list_length(&READY_TASK_LISTS[0]) > 1 {
+                if list::listCURRENT_LIST_LENGTH(&READY_TASK_LISTS[0]) > 1 {
                     taskYIELD!();
                 } else {
                     mtCOVERAGE_TEST_MARKER!();
@@ -122,24 +122,24 @@ pub fn create_idle_task() -> TaskHandle {
         }
     };
 
-    TCB::new()
-        .priority(0)
-        .name("Idle")
-        .initialise(idle_task_fn)
+    let mut tcb = TaskControlBlock::new();
+    tcb.set_priority(0);
+    tcb.set_name("Idle");
+    tcb.initialize(idle_task_fn)
         .unwrap_or_else(|err| panic!("Idle task creation failed with error: {:?}", err))
 }
 
 fn check_tasks_waiting_termination() {
     // TODO: Wait for task_delete.
     // 遍历所有任务，检查状态并处理待删除的任务
-    for task in all_tasks.iter() {
-        if task.is_waiting_for_termination() {
-            // 执行任务删除前的清理工作
-            task.cleanup();
-            // 从任务列表中移除
-            all_tasks.remove(task);
-        }
-    }
+    // for task in all_tasks.iter() {
+    //     if task.is_waiting_for_termination() {
+    //         // 执行任务删除前的清理工作
+    //         task.cleanup();
+    //         // 从任务列表中移除
+    //         all_tasks.remove(task);
+    //     }
+    // }
 }
 
 /// The second (optional) part of task_start_scheduler(),
@@ -148,22 +148,19 @@ fn create_timer_task() {
     // TODO: This function relies on the software timer, which we may not implement.
     // timer::create_timer_task()
     // On fail, panic!("No enough heap space to allocate timer task.");
-    // 创建一个定时器任务，周期性执行某些操作
-    let timer_task_fn = || loop {
-        // 定时器任务的执行逻辑
-        handle_timer_events();
-        // 让出CPU，等待下一个周期
-        taskYIELD!();
-    };
+    // // 创建一个定时器任务，周期性执行某些操作
+    // let timer_task_fn = || loop {
+    //     // 定时器任务的执行逻辑
+    //     handle_timer_events();
+    //     // 让出CPU，等待下一个周期
+    //     taskYIELD!();
+    // };
 
-    // 尝试创建定时器任务，设置优先级、名称等
-    match TCB::new()
-        .priority(1) // 定时器任务通常优先级较低
-        .name("Timer")
-        .initialise(timer_task_fn) {
-        Ok(_) => {},//println!("Timer task created successfully."),
-        Err(err) => panic!("Failed to create timer task: {:?}", err),
-    }
+    // // 尝试创建定时器任务，设置优先级、名称等
+    // let mut tcb = TaskControlBlock::new();
+    // tcb.set_priority(1); // 定时器任务通常优先级较低
+    // tcb.set_name("Timer");
+    // tcb.initialize(timer_task_fn);
 }
 
 /// The third part of task_step_scheduler, do some initialziation
@@ -177,7 +174,7 @@ fn initialize_scheduler() {
 
     portCONFIGURE_TIMER_FOR_RUN_TIME_STATS!();
 
-    if port::port_start_scheduler() != pdFALSE {
+    if port::port_start_scheduler() != pdFALSE!() {
         /* Should not reach here as if the scheduler is running the
         function will not return. */
     } else {
@@ -206,7 +203,7 @@ pub fn task_resume_all() -> bool {
 
     // TODO: This is a recoverable error, use Result<> instead.
     assert!(
-        get_scheduler_suspended!() > pdFALSE as UBaseType,
+        get_scheduler_suspended!() > pdFALSE!() as UBaseType,
         "The call to task_resume_all() does not match \
          a previous call to vTaskSuspendAll()."
     );
@@ -218,7 +215,7 @@ pub fn task_resume_all() -> bool {
             "get_current_number_of_tasks: {}",
             get_current_number_of_tasks!()
         );*/
-        if get_scheduler_suspended!() == pdFALSE as UBaseType {
+        if get_scheduler_suspended!() == pdFALSE!() as UBaseType {
             if get_current_number_of_tasks!() > 0 {
                 /*trace!(
                     "Current number of tasks is: {}, move tasks to ready list.",
@@ -252,7 +249,7 @@ pub fn task_resume_all() -> bool {
 
 fn move_tasks_to_ready_list() -> bool {
     let mut has_unblocked_task = false;
-    while !list::list_is_empty(&PENDING_READY_LIST) {
+    while !list::listLIST_IS_EMPTY(&PENDING_READY_LIST) {
         // trace!("PEDING_LIST not empty");
         has_unblocked_task = true;
         let task_handle = list::get_owner_of_head_entry(&PENDING_READY_LIST);
@@ -274,11 +271,11 @@ fn move_tasks_to_ready_list() -> bool {
 }
 
 fn reset_next_task_unblock_time() {
-    if list::list_is_empty(&DELAYED_TASK_LIST) {
+    if list::listLIST_IS_EMPTY(&DELAYED_TASK_LIST) {
         set_next_task_unblock_time!(port::portMAX_DELAY);
     } else {
         let task_handle = list::get_owner_of_head_entry(&DELAYED_TASK_LIST);
-        set_next_task_unblock_time!(list::get_list_item_value(
+        set_next_task_unblock_time!(list::listGET_LIST_ITEM_VALUE(
             &task_handle.get_state_list_item()
         ));
     }
@@ -323,7 +320,7 @@ pub fn task_step_tick(ticks_to_jump: TickType) {
 }
 
 pub fn task_switch_context() {
-    if get_scheduler_suspended!() > pdFALSE as UBaseType {
+    if get_scheduler_suspended!() > pdFALSE!() as UBaseType {
 
         set_yield_pending!(true);
     } else {
@@ -347,7 +344,7 @@ pub fn task_switch_context() {
 fn task_select_highest_priority_task() {
     let mut top_priority: UBaseType = get_top_ready_priority!();
 
-    while list::list_is_empty(&READY_TASK_LISTS[top_priority as usize]) {
+    while list::listLIST_IS_EMPTY(&READY_TASK_LISTS[top_priority as usize]) {
         assert!(top_priority > 0, "No task found with a non-zero priority");
         top_priority -= 1;
     }
@@ -362,11 +359,12 @@ fn task_select_highest_priority_task() {
 
 #[cfg(feature = "configGENERATE_RUN_TIME_STATS")]
 fn generate_context_switch_stats() {
-    let total_run_time = portGET_RUN_TIME_COUNTER_VALUE!() as u32;
+    // let total_run_time = portGET_RUN_TIME_COUNTER_VALUE!() as u32;
+    let total_run_time = 0 as u32;
     // trace!("Total runtime: {}", total_run_time);
     set_total_run_time!(total_run_time);
 
-    let task_switched_in_time = get_task_switch_in_time!();
+    let task_switched_in_time = get_task_switched_in_time!();
     if total_run_time > task_switched_in_time {
         let current_task = get_current_task_handle!();
         let old_run_time = current_task.get_run_time();
@@ -374,7 +372,7 @@ fn generate_context_switch_stats() {
     } else {
         mtCOVERAGE_TEST_MARKER!();
     }
-    set_task_switch_in_time!(total_run_time);
+    set_task_switched_in_time!(total_run_time);
 }
 
 pub fn task_increment_tick() -> bool {
@@ -384,13 +382,13 @@ pub fn task_increment_tick() -> bool {
     traceTASK_INCREMENT_TICK!(get_tick_count!());
 
     // trace!("SCHEDULER_SUSP is {}", get_scheduler_suspended!());
-    if get_scheduler_suspended!() == pdFALSE as UBaseType {
+    if get_scheduler_suspended!() == pdFALSE!() as UBaseType {
         let const_tick_count = get_tick_count!() + 1;
 
         set_tick_count!(const_tick_count);
 
         if const_tick_count == 0 {
-            switch_delayed_lists!();
+            switch_delayed_list!();
         } else {
             mtCOVERAGE_TEST_MARKER!();
         }
@@ -398,7 +396,7 @@ pub fn task_increment_tick() -> bool {
         if const_tick_count >= get_next_task_unblock_time!() {
             // trace!("UNBLOCKING!");
             loop {
-                if list::list_is_empty(&DELAYED_TASK_LIST) {
+                if list::listLIST_IS_EMPTY(&DELAYED_TASK_LIST) {
                     set_next_task_unblock_time!(port::portMAX_DELAY);
                     break;
                 } else {
@@ -406,7 +404,7 @@ pub fn task_increment_tick() -> bool {
                     let task_handle = delay_head_entry_owner;
                     let state_list_item = task_handle.get_state_list_item();
                     let event_list_item = task_handle.get_event_list_item();
-                    let item_value = list::get_list_item_value(&state_list_item);
+                    let item_value = list::listGET_LIST_ITEM_VALUE(&state_list_item);
 
                     if const_tick_count < item_value {
                         set_next_task_unblock_time!(item_value);
@@ -438,7 +436,7 @@ pub fn task_increment_tick() -> bool {
             #![cfg(all(feature = "configUSE_PREEMPTION", feature = "configUSE_TIME_SLICING"))]
             let cur_task_pri = get_current_task_priority!();
 
-            if list::current_list_length(&READY_TASK_LISTS[cur_task_pri as usize]) > 1 {
+            if list::listCURRENT_LIST_LENGTH(&READY_TASK_LISTS[cur_task_pri as usize]) > 1 {
                 switch_required = true;
             } else {
                 mtCOVERAGE_TEST_MARKER!();
@@ -480,7 +478,7 @@ pub fn task_get_scheduler_state() -> SchedulerState {
     if !get_scheduler_running!() {
         SchedulerState::NotStarted
     } else {
-        if get_scheduler_suspended!() == pdFALSE as UBaseType {
+        if get_scheduler_suspended!() == pdFALSE!() as UBaseType {
             SchedulerState::Running
         } else {
             SchedulerState::Suspended

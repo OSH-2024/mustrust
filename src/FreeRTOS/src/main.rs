@@ -6,6 +6,7 @@
 
 mod bindings;
 mod FreeRTOS_tick_config;
+mod kernel;
 mod list;
 mod port;
 mod projdefs;

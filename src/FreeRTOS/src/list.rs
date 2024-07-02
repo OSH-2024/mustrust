@@ -117,6 +117,7 @@ type MiniListItem_t = xMINI_LIST_ITEM;
 pub type MiniItemLink = Arc<RwLock<MiniListItem_t>>;
 pub type WeakMiniItemLink = Weak<RwLock<MiniListItem_t>>; */
 
+#[derive(Clone)]
 pub struct xLIST
 {
     // 链表节点计数器

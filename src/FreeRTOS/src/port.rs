@@ -1,4 +1,5 @@
 use crate::bindings::*;
+use crate::projdefs::*;
 use cty;
 
 pub type StackType = usize;

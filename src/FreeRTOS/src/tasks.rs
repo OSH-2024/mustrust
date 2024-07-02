@@ -1,6 +1,7 @@
 use crate::*;
 use crate::list::*;
 use crate::port::*;
+use crate::projdefs::*;
 use alloc::boxed::*;
 use alloc::string::*;
 use alloc::sync::{Arc, Weak};
@@ -19,11 +20,6 @@ macro_rules! taskYIELD_IF_USING_PREEMPTION { () => { } }
 
 #[cfg(not(feature = "configUSE_PREEMPTION"))]
 macro_rules! taskYIELD_IF_USING_PREEMPTION { () => { portYIELD_WITHIN_API!() } }
-
-#[macro_export]
-macro_rules! taskENTER_CRITICAL { () => { portENTER_CRITICAL!() } }
-#[macro_export]
-macro_rules! taskEXIT_CRITICAL { () => { portEXIT_CRITICAL!() } }
 
 #[macro_export]
 macro_rules! taskNOT_WAITING_NOTIFICATION { () => { 0 as u8 } }
@@ -57,16 +53,6 @@ macro_rules! tskDELETED_CHAR { () => { 'D' } }
 #[macro_export]
 macro_rules! tskSUSPENDED_CHAR { () => { 'S' } }
 
-#[cfg(not(feature = "configUSE_PORT_OPTIMISED_TASK_SELECTION"))]
-#[macro_export]
-macro_rules! taskRECORD_READY_PRIORITY {
-    ($uxPriority: expr) => {
-        if $uxPriority > get_top_ready_priority!() {
-            set_top_ready_priority!($uxPriority);
-        }
-    };
-}
-
 // #[cfg(not(feature = "configUSE_PORT_OPTIMISED_TASK_SELECTION"))]
 // fn taskSelectHighestPriorityTask() {
 //     let mut uxTopPriority: UBaseType = get_top_ready_priority!();
@@ -82,12 +68,6 @@ macro_rules! taskRECORD_READY_PRIORITY {
 //     CURRENT_TCB = list::get_owner_of_next_entry(&READY_TASK_LISTS[uxTopPriority as usize]);
 //     set_top_ready_priority!(uxTopPriority);
 // }
-
-#[cfg(not(feature = "configUSE_PORT_OPTIMISED_TASK_SELECTION"))]
-#[macro_export]
-macro_rules! taskRESET_READY_PRIORITY {
-    ($uxPriority: expr) => {};
-}
 
 #[cfg(feature = "configUSE_16_BIT_TICKS")]
 #[macro_export]
@@ -111,7 +91,7 @@ pub struct TaskControlBlock {
     #[cfg(feature = "configUSE_MUTEXES")]
     mutexed_held: UBaseType,
     #[cfg(feature = "configGENERATE_RUN_TIME_STATS")]
-    runtime_counter: TickType,
+    run_time_counter: TickType,
     #[cfg(feature = "configUSE_TASK_NOTIFICATIONS")]
     notified_value: u32,
     #[cfg(feature = "configUSE_TASK_NOTIFICATIONS")]
@@ -142,7 +122,7 @@ impl TaskControlBlock {
             #[cfg(feature = "configUSE_MUTEXES")]
             mutexed_held: 0,
             #[cfg(feature = "configGENERATE_RUN_TIME_STATS")]
-            runtime_counter: 0,
+            run_time_counter: 0,
             #[cfg(feature = "configUSE_TASK_NOTIFICATIONS")]
             notified_value: 0,
             #[cfg(feature = "configUSE_TASK_NOTIFICATIONS")]
@@ -203,14 +183,14 @@ impl TaskControlBlock {
     }
 
     #[cfg(feature = "configGENERATE_RUN_TIME_STATS")]
-    pub fn get_runtime(&self) -> TickType {
-        self.runtime_counter
+    pub fn get_run_time(&self) -> TickType {
+        self.run_time_counter
     }
 
     #[cfg(feature = "configGENERATE_RUN_TIME_STATS")]
-    pub fn set_runtime(&mut self, next_val: TickType) -> TickType {
-        let prev_val = self.runtime_counter;
-        self.runtime_counter = next_val;
+    pub fn set_run_time(&mut self, next_val: TickType) -> TickType {
+        let prev_val = self.run_time_counter;
+        self.run_time_counter = next_val;
         prev_val
     }
 
@@ -244,7 +224,7 @@ impl TaskControlBlock {
         let stacksize_as_bytes = size_of_stacktype * self.stack_length as usize;
         // Initialize stack
         let px_stack = port::port_malloc(stacksize_as_bytes)?;
-        self.stack_pointer = px_stack as *mut StackType;
+        self.stack_pointer = px_stack as StackType;
         let mut top_of_stack = self.stack_pointer + self.stack_length as usize - 1;
         top_of_stack = top_of_stack & portBYTE_ALIGNMENT_MASK as StackType;
         // Initialize task
@@ -269,7 +249,7 @@ impl TaskControlBlock {
 
         #[cfg(feature = "configGENERATE_RUN_TIME_STATS")]
         {
-            self.runtime_counter = 0;
+            self.run_time_counter = 0;
         }
         
         let stack_ptr = self.stack_pointer;
@@ -330,13 +310,13 @@ macro_rules! GetTaskControlBlockWrite {
 
 impl TaskHandle {
     #[cfg(feature = "configGENERATE_RUN_TIME_STATS")]
-    pub fn get_runtime(&self) -> TickType {
-        GetTaskControlBlockRead!(self).get_runtime()
+    pub fn get_run_time(&self) -> TickType {
+        GetTaskControlBlockRead!(self).get_run_time()
     }
 
     #[cfg(feature = "configGENERATE_RUN_TIME_STATS")]
-    pub fn set_runtime(&self, next_val: TickType) -> TickType {
-        GetTaskControlBlockWrite!(self).set_runtime(next_val)
+    pub fn set_run_time(&self, next_val: TickType) -> TickType {
+        GetTaskControlBlockWrite!(self).set_run_time(next_val)
     }
 
     #[cfg(feature = "INCLUDE_xTaskAbortDelay")]
@@ -404,8 +384,8 @@ impl TaskHandle {
 
         taskENTER_CRITICAL!();
         {
-            let tcb = GetTaskControlBlockWrite!(self);
-            let px_tcb: &TaskControlBlock = &tcb;
+            let mut tcb = GetTaskControlBlockWrite!(self);
+            let px_tcb: &mut TaskControlBlock = &mut *tcb;
             traceTASK_PRIORITY_SET!(px_tcb, priority);
 
             {

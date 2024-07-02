@@ -1,4 +1,14 @@
 
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub enum FreeRtosError {
+    OutOfMemory,
+    Timeout,
+    TaskNotFound,
+    ProcessorHasShutDown,
+    DeadLocked,
+    PortError,
+}
+
 //const int pdFALSE = 0;
 //const int pdTRUE = 1;
 #[macro_export]
