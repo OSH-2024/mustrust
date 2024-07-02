@@ -13,6 +13,7 @@ mod queue;
 mod queue_api;
 mod queue_h;
 mod rwlock;
+mod semaphore;
 mod task_global;
 mod task_queue;
 mod tasks;

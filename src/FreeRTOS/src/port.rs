@@ -41,7 +41,8 @@ macro_rules! portYIELD_FROM_ISR {
 
 pub fn portSET_INTERRUPT_MASK_FROM_ISR() -> BaseType {
     port_initialize_blocks();
-    unsafe { crate::bindings::xPortSetInterruptMask() as BaseType }
+    // unsafe { crate::bindings::xPortSetInterruptMask() as BaseType }
+    0
 }
 
 #[macro_export]

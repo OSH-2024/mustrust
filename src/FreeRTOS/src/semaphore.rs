@@ -1,7 +1,7 @@
 use crate::port::*;
 use crate::queue::*;
 use crate::queue_h::*;
-use crate::task_control::*;
+use crate::tasks::*;
 use crate::*;
 use core::cell::UnsafeCell;
 
@@ -18,8 +18,8 @@ impl Semaphore {
         feature = "configUSE_MUTEXES",
         feature = "INCLUDE_xSemaphoreGetMutexHolder"
     ))]
-    pub fn get_mutex_holder(&self) -> Option<task_control::TaskHandle> {
-        let mut mutex_holder: Option<task_control::TaskHandle>;
+    pub fn get_mutex_holder(&self) -> Option<tasks::TaskHandle> {
+        let mut mutex_holder: Option<tasks::TaskHandle>;
         taskENTER_CRITICAL!();
         {
             unsafe {
