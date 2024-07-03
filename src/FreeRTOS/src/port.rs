@@ -258,13 +258,13 @@ pub fn port_initialize_stack(
     }
 }
 
-// pub fn memcpy(dst: *mut c_void, src: *mut c_void, n: usize) -> *mut c_void {
-//     unsafe { 
-//         let p=src as *mut u8;
-//         let q=dst as *mut u8;
-//         for i in 0..n {
-//             *q.offset(i as isize) = *p.offset(i as isize);
-//         }
-//         dst
-//     }
-// }
+pub fn memcpy(dst: CVoidPointer, src: CVoidPointer, n: usize) -> CVoidPointer {
+    unsafe { 
+        let p=src as *mut u8;
+        let q=dst as *mut u8;
+        for i in 0..n {
+            *q.offset(i as isize) = *p.offset(i as isize);
+        }
+        dst
+    }
+}
