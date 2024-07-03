@@ -119,7 +119,7 @@ impl<T> Linkedlist<T> {
         if pos == -1 {
             return false
         }
-        self.pop_pos(pos)
+        self.pop_pos(pos);
         self.push(*data);
         true
     }

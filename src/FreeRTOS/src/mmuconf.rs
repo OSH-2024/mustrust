@@ -3,7 +3,7 @@ use alloc::string::*;
 use alloc::vec::*;
 use crate::linkedlist::*;
 
-#[Derive(Default)]
+#[derive(Default)]
 pub struct Line {
     valid: bool,
     reference: bool,
@@ -12,7 +12,7 @@ pub struct Line {
     frame_number: i32,
 }
 
-#[Derive(Default)]
+#[derive(Default)]
 pub struct Entry {
     valid: bool,
     modified: bool,
@@ -20,7 +20,7 @@ pub struct Entry {
     disk_address: i32,
 }
 
-#[Derive(Default)]
+#[derive(Default)]
 pub struct TCB {
     name: String,
     page_table: Vec<Entry>,
@@ -67,26 +67,35 @@ pub const page_count: i32 = memory_size / page_size;
 pub const disk_size: i32 = 4096 * memory_size_kb; // Assuming 4 times memory size
 pub const virtual_space: i32 = 2048 * memory_size_kb; // Assuming 2 times memory size
 pub const page_table_size: i32 = virtual_space / page_size;
-pub const tlb_size: 4 * memory_size_kb;
-pub const time_tlb_access: f64 = 1e-9;
-pub const time_memory_access: f64 = 1e-7;
-pub const time_cache_access: f64 = 1e-7;
-pub const time_disk_access: f64 = 1e-3;
+pub const tlb_size: i32 = 4 * memory_size_kb;
+pub const time_tlb_access: u64 = 1;
+pub const time_memory_access: u64 = 100;
+pub const time_cache_access: u64 = 100;
+pub const time_disk_access: u64 = 1000000;
 pub const start_address: i32 = 0;
 
-static mut memory: [i32; memory_size] = [0; memory_size];
-static mut disk: [i32; disk_size] = [0; disk_size];
-static mut tlb: [Line; tlb_size] = [0; tlb_size];
-static mut tcb: Box<TCB> = Box::new(TCB::default());
+pub static mut memory: [u32; memory_size] = [0; memory_size];
+pub static mut disk: [u32; disk_size] = [0; disk_size];
+pub static mut tlb: [Line; tlb_size] = [0; tlb_size];
+pub static mut tcb: Box<TCB> = Box::new(TCB::default());
 
-static mut tlb_hit: i32 = 0;
-static mut tlb_miss: i32 = 0;
-static mut memory_hit: i32 = 0;
-static mut memory_miss: i32 = 0;
-static mut replace_count_fifo: i32 = 0;
-static mut time_cost: f64 = 0.0;
+pub static mut tlb_hit: u32 = 0;
+pub static mut tlb_miss: u32 = 0;
+pub static mut memory_hit: u32 = 0;
+pub static mut memory_miss: u32 = 0;
+pub static mut replace_count_fifo: u32 = 0;
+pub static mut time_cost: u64 = 0;
 
-#[Derive(Default, Eq)]
+pub fn stat_init() {
+    tlb_hit = 0;
+    tlb_miss = 0;
+    memory_hit = 0;
+    memory_miss = 0;
+    replace_count_fifo = 0;
+    time_cost = 0.0;
+}
+
+#[derive(Default, PartialEq)]
 pub struct Item {
     frame_number: i32,
     page_number: i32,
@@ -103,14 +112,14 @@ impl Default for Item {
     }
 }
 
-impl Eq for Item {
+impl PartialEq for Item {
     fn eq(&self, other: &Self) -> bool {
         self.frame_number == other.frame_number
     }
 }
 
-static mut lru_list: Linkedlist<Item> = Linkedlist<Item>::new();
-static mut fifo_list: Linkedlist<Item> = Linkedlist<Item>::new();
+static mut lru_list: Linkedlist<Item> = Linkedlist::<Item>::new();
+static mut fifo_list: Linkedlist<Item> = Linkedlist::<Item>::new();
 
 pub fn read_to_memory(frame: i32, disk_address_begin: i32) {
     for i in 0..page_size {

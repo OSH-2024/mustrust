@@ -48,11 +48,24 @@ pub extern "C" fn io_halt() {
 pub extern "C" fn TaskA(pvParameters: *mut cty::c_void) {
     unsafe {
         uart_puts("MMU Testing task start\n");
-        loop {
-            uart_puthex(bindings::xTaskGetTickCount());
-            uart_putchar(b'\n');
-            bindings::vTaskDelay((500 / portTICK_RATE_MS!()) as u64);
-        }
+        uart_puts("Task 1. Bubble sort test\n");
+        mmuconf::stat_init();
+        mmutest::random_initialize(0, 114514);
+        mmutest::bubble_sort();
+        uart_puts("Task 1 ended.\n");
+        uart_puts("TLB hit rate: ");
+        uart_putdec(mmuconf::tlb_hit);
+        uart_puts(" / ");
+        uart_putdec(mmuconf::tlb_hit + mmuconf::tlb_miss);
+        uart_puts("\n");
+        uart_puts("Memory hit rate: ");
+        uart_putdec(mmuconf::memory_hit);
+        uart_puts(" / ");
+        uart_putdec(mmuconf::memory_hit + mmuconf::memory_miss);
+        uart_puts("\n");
+        uart_puts("Estimated execution time: ");
+        uart_putdec(mmuconf::time_cost);
+        uart_puts("ns\n");
     }
 }
 
@@ -80,7 +93,7 @@ pub extern "C" fn main() -> ! {
         let mut task_a: bindings::TaskHandle_t = 0 as *mut cty::c_void;
         uart_init();
         uart_puts("qemu exit: Ctrl-A x / qemu monitor: Ctrl-A c\n");
-        uart_puts("Program by MUSTRUST, USTC OSH 2024")
+        uart_puts("Program by MUSTRUST, USTC OSH 2024");
         uart_puts("Start MMU Simulation\n");
         bindings::xTaskCreate(Some(TaskA), task_name, 512, 0 as *mut cty::c_void, bindings::tskIDLE_PRIORITY as u64, &mut task_a);
         timer = bindings::xTimerCreate(timer_name, (10 / portTICK_RATE_MS!()) as u64, bindings::pdTRUE as u64, 0 as *mut cty::c_void, Some(interval_func));
