@@ -7,7 +7,10 @@
 mod bindings;
 mod FreeRTOS_tick_config;
 mod kernel;
+mod linkedlist;
 mod list;
+mod mmuconf;
+mod mmutest;
 mod port;
 mod projdefs;
 mod queue;
@@ -44,7 +47,7 @@ pub extern "C" fn io_halt() {
 
 pub extern "C" fn TaskA(pvParameters: *mut cty::c_void) {
     unsafe {
-        uart_puts("start TaskA\n");
+        uart_puts("MMU Testing task start\n");
         loop {
             uart_puthex(bindings::xTaskGetTickCount());
             uart_putchar(b'\n');
@@ -77,7 +80,8 @@ pub extern "C" fn main() -> ! {
         let mut task_a: bindings::TaskHandle_t = 0 as *mut cty::c_void;
         uart_init();
         uart_puts("qemu exit: Ctrl-A x / qemu monitor: Ctrl-A c\n");
-        uart_puts("hello world\n");
+        uart_puts("Program by MUSTRUST, USTC OSH 2024")
+        uart_puts("Start MMU Simulation\n");
         bindings::xTaskCreate(Some(TaskA), task_name, 512, 0 as *mut cty::c_void, bindings::tskIDLE_PRIORITY as u64, &mut task_a);
         timer = bindings::xTimerCreate(timer_name, (10 / portTICK_RATE_MS!()) as u64, bindings::pdTRUE as u64, 0 as *mut cty::c_void, Some(interval_func));
         if timer != (0 as *mut cty::c_void) {

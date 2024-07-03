@@ -53,6 +53,22 @@ pub fn uart_puthex(v: u64) {
     }
 }
 
+pub fn uart_putdec(v: u64) {
+    let digits = "0123456789".as_bytes();
+    let mut v = v;
+    let mut w = 1;
+    while w <= v {
+        w *= 10;
+    }
+    w /= 10;
+
+    while w > 0 {
+        uart_putchar(digits[(v / w) as usize]);
+        v %= w;
+        w /= 10;
+    }
+}
+
 pub fn uart_read_bytes(buf: &mut [u8], length: u32) -> u32 {
     let num: u32 = unsafe { bindings::uxQueueMessagesWaiting((*uartctl).rx_queue) } as u32;
     let mut i: u32 = 0;
