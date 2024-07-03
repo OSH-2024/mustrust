@@ -1,4 +1,5 @@
 use crate::bindings::*;
+use crate::projdefs::*;
 use cty;
 
 pub type StackType = usize;
@@ -8,7 +9,10 @@ pub type TickType = u32;
 pub type CVoidPointer = *mut cty::c_void;
 
 pub const portBYTE_ALIGNMENT_MASK: UBaseType = 4;
-pub const portMAX_DELAY: TickType = if configUSE_16_BIT_TICKS!() { 0xffff } else { 0xffffffff };
+#[cfg(feature = "configUSE_16_BIT_TICKS")]
+pub const portMAX_DELAY: TickType = 0xffff;
+#[cfg(not(feature = "configUSE_16_BIT_TICKS"))]
+pub const portMAX_DELAY: TickType = 0xffffffff;
 
 #[macro_export]
 macro_rules! portYIELD { () => { unsafe { asm!("SVC 0"); } } }
@@ -36,19 +40,17 @@ macro_rules! portYIELD_FROM_ISR {
     }
 }
 
-#[macro_export]
-macro_rules! portSET_INTERRUPT_MASK_FROM_ISR {
-    () => {
-        port_initialize_blocks();
-        // unsafe { (crate::bindings::xPortSetInterruptMask() as BaseType) }
-    };
+pub fn portSET_INTERRUPT_MASK_FROM_ISR() -> BaseType {
+    port_initialize_blocks();
+    // unsafe { crate::bindings::xPortSetInterruptMask() as BaseType }
+    0
 }
 
 #[macro_export]
 macro_rules! portCLEAR_INTERRUPT_MASK_FROM_ISR {
     ($xMask: expr) => {
         // unsafe { crate::bindings::vPortClearInterruptMask($xMask as BaseType) }
-    };
+    }
 }
 
 #[macro_export]
@@ -197,7 +199,7 @@ type PointerSizeType = u64;
 
 pub fn port_malloc(size: usize) -> Result<CVoidPointer, FreeRtosError> {
     unsafe {
-        let mut ret_ptr: *mut c_void = core::ptr::null_mut();
+        let mut ret_ptr: *mut cty::c_void = core::ptr::null_mut();
         if size == 0 {
             Err(FreeRtosError::OutOfMemory)
         }
@@ -207,7 +209,7 @@ pub fn port_malloc(size: usize) -> Result<CVoidPointer, FreeRtosError> {
     }
 }
 
-pub fn port_free(pv: *mut ::std::os::raw::c_void) {
+pub fn port_free(pv: *mut cty::c_void) {
     // unsafe { vPortFree(pv) }
 }
 
@@ -244,7 +246,7 @@ pub fn port_end_scheduler() {
 pub fn port_initialize_stack(
     top_of_stack: *mut StackType,
     code: StackType,
-    param_ptr: *mut c_void,
+    param_ptr: *mut cty::c_void,
 ) -> Result<*mut StackType, FreeRtosError> {
     let num: usize = 0;
     let mut ret_val: *mut usize = core::ptr::null_mut();

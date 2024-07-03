@@ -1,22 +1,25 @@
+use crate::*;
 use crate::list::*;
+use crate::port::*;
+use crate::projdefs::*;
+use alloc::boxed::*;
+use alloc::string::*;
 use alloc::sync::{Arc, Weak};
 use core::ops::FnOnce;
 use core::mem;
+use core::default::*;
 use crate::port;
-use crate::task_global;
+use crate::task_global::*;
 use cty;
-use no_std_async::rwlock::RwLock;
+use crate::rwlock::*;
 
 pub type TaskHandleType = *mut cty::c_void;
 
-#[cfg(configUSE_PREEMPTION!() = 0)]
+#[cfg(feature = "configUSE_PREEMPTION")]
 macro_rules! taskYIELD_IF_USING_PREEMPTION { () => { } }
 
-#[cfg(configUSE_PREEMPTION!() = 1)]
+#[cfg(not(feature = "configUSE_PREEMPTION"))]
 macro_rules! taskYIELD_IF_USING_PREEMPTION { () => { portYIELD_WITHIN_API!() } }
-
-#[macro_export]
-macro_rules! taskENTER_CRITICAL { () => { portENTER_CRITICAL!() } }
 
 #[macro_export]
 macro_rules! taskNOT_WAITING_NOTIFICATION { () => { 0 as u8 } }
@@ -50,37 +53,21 @@ macro_rules! tskDELETED_CHAR { () => { 'D' } }
 #[macro_export]
 macro_rules! tskSUSPENDED_CHAR { () => { 'S' } }
 
-#[cfg(not(feature = "configUSE_PORT_OPTIMISED_TASK_SELECTION"))]
-#[macro_export]
-macro_rules! taskRECORD_READY_PRIORITY {
-    ($uxPriority: expr) => {
-        if $uxPriority > get_top_ready_priority!() {
-            set_top_ready_priority!($uxPriority);
-        }
-    };
-}
+// #[cfg(not(feature = "configUSE_PORT_OPTIMISED_TASK_SELECTION"))]
+// fn taskSelectHighestPriorityTask() {
+//     let mut uxTopPriority: UBaseType = get_top_ready_priority!();
 
-#[cfg(not(feature = "configUSE_PORT_OPTIMISED_TASK_SELECTION"))]
-fn taskSelectHighestPriorityTask() {
-    let mut uxTopPriority: UBaseType = uxTopReadyPriority;
+//     /* Find the highest priority queue that contains ready tasks. */
+//     while list::listLIST_IS_EMPTY(&READY_TASK_LISTS[uxTopPriority as usize]) {
+//         assert!(uxTopPriority > 0, "No non-zero priority task found.");
+//         uxTopPriority -= 1;
+//     }
 
-    /* Find the highest priority queue that contains ready tasks. */
-    while list::list_is_empty(&READY_TASK_LISTS[uxTopPriority as usize]) {
-        assert!(uxTopPriority > 0, "No non-zero priority task found.");
-        uxTopPriority -= 1;
-    }
-
-    /* listGET_OWNER_OF_NEXT_ENTRY indexes through the list, so the tasks of
-    the same priority get an equal share of the processor time. */
-    pxCurrentTCB = list::get_owner_of_next_entry(&pxReadyTasksLists[uxTopPriority as usize]);
-    uxTopReadyPriority = uxTopPriority;
-}
-
-#[cfg(not(feature = "configUSE_PORT_OPTIMISED_TASK_SELECTION"))]
-#[macro_export]
-macro_rules! taskRESET_READY_PRIORITY {
-    ($uxPriority: expr) => {};
-}
+//     /* listGET_OWNER_OF_NEXT_ENTRY indexes through the list, so the tasks of
+//     the same priority get an equal share of the processor time. */
+//     CURRENT_TCB = list::get_owner_of_next_entry(&READY_TASK_LISTS[uxTopPriority as usize]);
+//     set_top_ready_priority!(uxTopPriority);
+// }
 
 #[cfg(feature = "configUSE_16_BIT_TICKS")]
 #[macro_export]
@@ -90,11 +77,11 @@ macro_rules! taskEVENT_LIST_ITEM_VALUE_IN_USE { () => { 0x8000 as u16 } }
 macro_rules! taskEVENT_LIST_ITEM_VALUE_IN_USE { () => { 0x80000000 as u32 } }
 
 pub struct TaskControlBlock {
-    state_list_item: ListItem,
-    event_list_item: ListItem,
+    state_list_item: ItemLink,
+    event_list_item: ItemLink,
     priority: UBaseType,
     task_name: String,
-    stack_pointer: StackType_t,
+    stack_pointer: StackType,
     stack_length: UBaseType,
 
     #[cfg(feature = "portCRITICAL_NESTING_IN_TCB")]
@@ -104,7 +91,7 @@ pub struct TaskControlBlock {
     #[cfg(feature = "configUSE_MUTEXES")]
     mutexed_held: UBaseType,
     #[cfg(feature = "configGENERATE_RUN_TIME_STATS")]
-    runtime_counter: TickType_t,
+    run_time_counter: TickType,
     #[cfg(feature = "configUSE_TASK_NOTIFICATIONS")]
     notified_value: u32,
     #[cfg(feature = "configUSE_TASK_NOTIFICATIONS")]
@@ -122,8 +109,8 @@ impl PartialEq for TaskControlBlock {
 impl TaskControlBlock {
     pub fn new() -> Self {
         Self {
-            state_list_item: ListItem::default(),
-            event_list_item: ListItem::default(),
+            state_list_item: Default::default(),
+            event_list_item: Default::default(),
             priority: 1,
             task_name: String::from("New task"),
             stack_pointer: 0,
@@ -135,7 +122,7 @@ impl TaskControlBlock {
             #[cfg(feature = "configUSE_MUTEXES")]
             mutexed_held: 0,
             #[cfg(feature = "configGENERATE_RUN_TIME_STATS")]
-            runtime_counter: 0,
+            run_time_counter: 0,
             #[cfg(feature = "configUSE_TASK_NOTIFICATIONS")]
             notified_value: 0,
             #[cfg(feature = "configUSE_TASK_NOTIFICATIONS")]
@@ -149,12 +136,12 @@ impl TaskControlBlock {
         self.task_name.as_str()
     }
 
-    pub fn set_name(&mut self, name: &str) -> Self {
+    pub fn set_name(&mut self, name: &str) -> &mut Self {
         self.task_name = String::from(name);
         self
     }
 
-    pub fn set_stack_length(&mut self, length: UBaseType) -> Self {
+    pub fn set_stack_length(&mut self, length: UBaseType) -> &mut Self {
         self.stack_length = length;
         self
     }
@@ -163,7 +150,7 @@ impl TaskControlBlock {
         self.priority.clone()
     }
 
-    pub fn set_priority(mut self, priority: UBaseType) -> Self {
+    pub fn set_priority(&mut self, priority: UBaseType) {
         if priority > configMAX_PRIORITIES!() {
             // Warning: Priority exceeded
             self.priority = configMAX_PRIORITIES!() - 1;
@@ -171,14 +158,13 @@ impl TaskControlBlock {
         else {
             self.priority = priority;
         }
-        self
     }
 
     pub fn get_base_priority(&self) -> UBaseType {
         self.base_priority
     }
 
-    pub fn set_base_priority(mut self, priority: UBaseType) -> Self {
+    pub fn set_base_priority(&mut self, priority: UBaseType) {
         if priority > configMAX_PRIORITIES!() {
             // Warning: Priority exceeded
             self.base_priority = configMAX_PRIORITIES!() - 1;
@@ -186,26 +172,25 @@ impl TaskControlBlock {
         else {
             self.base_priority = priority;
         }
-        self
     }
 
-    pub fn get_stack_list_item(&self) -> ListItem {
-        self.state_list_item.clone()
+    pub fn get_state_list_item(&self) -> ItemLink {
+        Arc::clone(&self.state_list_item)
     }
 
-    pub fn get_event_list_item(&self) -> ListItem {
-        self.event_list_item.clone()
-    }
-
-    #[cfg(feature = "configGENERATE_RUN_TIME_STATS")]
-    pub fn get_runtime(&self) -> TickType_t {
-        self.runtime_counter
+    pub fn get_event_list_item(&self) -> ItemLink {
+        Arc::clone(&self.event_list_item)
     }
 
     #[cfg(feature = "configGENERATE_RUN_TIME_STATS")]
-    pub fn set_runtime(&mut self, next_val: TickType_t) -> TickType_t {
-        let prev_val = self.runtime_counter;
-        self.runtime_counter = next_val;
+    pub fn get_run_time(&self) -> TickType {
+        self.run_time_counter
+    }
+
+    #[cfg(feature = "configGENERATE_RUN_TIME_STATS")]
+    pub fn set_run_time(&mut self, next_val: TickType) -> TickType {
+        let prev_val = self.run_time_counter;
+        self.run_time_counter = next_val;
         prev_val
     }
 
@@ -239,13 +224,13 @@ impl TaskControlBlock {
         let stacksize_as_bytes = size_of_stacktype * self.stack_length as usize;
         // Initialize stack
         let px_stack = port::port_malloc(stacksize_as_bytes)?;
-        self.stack_pointer = px_stack as *mut StackType;
-        let mut top_of_stack = self.stack_pointer + self.stack_length - 1;
-        top_of_stack = top_of_stack & portBYTE_ALIGNMENT_MASK as *mut StackType;
+        self.stack_pointer = px_stack as StackType;
+        let mut top_of_stack = self.stack_pointer + self.stack_length as usize - 1;
+        top_of_stack = top_of_stack & portBYTE_ALIGNMENT_MASK as StackType;
         // Initialize task
         let f = Box::new(Box::new(func) as Box<dyn FnOnce()>);
         let param_ptr = &*f as *const _ as *mut _;
-        let result = port::port_initialise_stack(top_of_stack as *mut _, 32, param_ptr);
+        let result = port::port_initialize_stack(top_of_stack as *mut _, 32, param_ptr);
         match result {
             Ok(_) => core::mem::forget(f),
             Err(e) => return Err(e),
@@ -264,16 +249,15 @@ impl TaskControlBlock {
 
         #[cfg(feature = "configGENERATE_RUN_TIME_STATS")]
         {
-            self.runtime_counter = 0;
+            self.run_time_counter = 0;
         }
         
         let stack_ptr = self.stack_pointer;
         let handle = TaskHandle(Arc::new(RwLock::new(self)));
         list::set_list_item_owner(&handle.get_state_list_item(), handle.clone());
         list::set_list_item_owner(&handle.get_event_list_item(), handle.clone());
-        list::set_list_item_owner(&handle.get_stack_list_item(), handle.clone());
         let item_value = (configMAX_PRIORITIES!() - handle.get_priority()) as TickType;
-        list::listSET_LIST_ITEM_VALUE(&handle.get_stack_list_item(), item_value);
+        list::listSET_LIST_ITEM_VALUE(&handle.get_state_list_item(), item_value);
         Ok(handle)
     }
 }
@@ -283,7 +267,7 @@ pub struct TaskHandle(Arc<RwLock<TaskControlBlock>>);
 
 impl PartialEq for TaskHandle {
     fn eq(&self, other: &Self) -> bool {
-        *self.0.read().unwrap() == *other.0.read().unwrap()
+        *self.0.read() == *other.0.read()
     }
 }
 
@@ -313,32 +297,26 @@ pub fn record_ready_priority(priority: UBaseType) {
 #[macro_export]
 macro_rules! GetTaskControlBlockRead {
     ($handle: expr) => {
-        match $handle.0.try_read() {
-            Ok(x) => x,
-            Err(_) => panic!("Task handle locked"),
-        }
+        $handle.0.read()
     }
 }
 
 #[macro_export]
 macro_rules! GetTaskControlBlockWrite {
     ($handle: expr) => {
-        match $handle.0.try_write() {
-            Ok(x) => x,
-            Err(_) => panic!("Task handle locked"),
-        }
+        $handle.0.write()
     }
 }
 
 impl TaskHandle {
     #[cfg(feature = "configGENERATE_RUN_TIME_STATS")]
-    pub fn get_runtime(&self) -> TickType_t {
-        GetTaskControlBlockRead!(self).get_runtime()
+    pub fn get_run_time(&self) -> TickType {
+        GetTaskControlBlockRead!(self).get_run_time()
     }
 
     #[cfg(feature = "configGENERATE_RUN_TIME_STATS")]
-    pub fn set_runtime(&self, next_val: TickType_t) -> TickType_t {
-        GetTaskControlBlockWrite!(self).set_runtime(next_val)
+    pub fn set_run_time(&self, next_val: TickType) -> TickType {
+        GetTaskControlBlockWrite!(self).set_run_time(next_val)
     }
 
     #[cfg(feature = "INCLUDE_xTaskAbortDelay")]
@@ -373,16 +351,16 @@ impl TaskHandle {
         Arc::into_raw(self.0) as TaskHandleType
     }
 
-    pub fn get_event_list_item(&self) -> ListItem {
+    pub fn get_event_list_item(&self) -> ItemLink {
         GetTaskControlBlockRead!(self).get_event_list_item()
     }
 
-    pub fn get_state_list_item(&self) -> ListItem {
+    pub fn get_state_list_item(&self) -> ItemLink {
         GetTaskControlBlockRead!(self).get_state_list_item()
     }
 
     pub fn get_name(&self) -> String {
-        GetTaskControlBlockRead!(self).get_name()
+        GetTaskControlBlockRead!(self).get_name().to_string()
     }
 
     pub fn get_priority(&self) -> UBaseType {
@@ -390,7 +368,7 @@ impl TaskHandle {
     }
 
     pub fn set_priority(&self, priority: UBaseType) {
-        GetTaskControlBlockWrite!(self).set_priority(priority)
+        GetTaskControlBlockWrite!(self).set_priority(priority);
     }
 
     pub fn set_priority_in_detail(&mut self, priority: UBaseType) {
@@ -406,8 +384,8 @@ impl TaskHandle {
 
         taskENTER_CRITICAL!();
         {
-            let tcb = GetTaskControlBlockWrite!(self);
-            let px_tcb: &TaskControlBlock = &tcb;
+            let mut tcb = GetTaskControlBlockWrite!(self);
+            let px_tcb: &mut TaskControlBlock = &mut *tcb;
             traceTASK_PRIORITY_SET!(px_tcb, priority);
 
             {
@@ -443,7 +421,7 @@ impl TaskHandle {
             let state_list_item = px_tcb.get_state_list_item();
 
             unsafe {
-                if (list::listGET_LIST_ITEM_VALUE(&event_list_item) & taskEVENT_LIST_ITEM_VALUE_IN_USE) == 0 {
+                if (list::listGET_LIST_ITEM_VALUE(&event_list_item) & taskEVENT_LIST_ITEM_VALUE_IN_USE!()) == 0 {
                     list::listSET_LIST_ITEM_VALUE(&event_list_item, (configMAX_PRIORITIES!() - priority) as TickType);
                 }
             }
@@ -467,7 +445,7 @@ impl TaskHandle {
     }
 
     pub fn set_base_priority(&self, priority: UBaseType) {
-        GetTaskControlBlockWrite!(self).set_base_priority(priority)
+        GetTaskControlBlockWrite!(self).set_base_priority(priority);
     }
 
     pub fn add_task_to_ready_list(&self) -> Result<(), FreeRtosError> {
@@ -487,11 +465,11 @@ impl TaskHandle {
         {
             let current_number_of_tasks = get_current_number_of_tasks!() + 1;
             set_current_number_of_tasks!(current_number_of_tasks);
-            if task_global::CURRENT_TCB.read().unwrap().is_none() {
+            if task_global::CURRENT_TCB.read().is_none() {
                 set_current_task_handle!(self.clone());
             }
             else {
-                let task_handle = get_current_task_handle!();
+                let task_handle = &get_current_task_handle!();
                 if !get_scheduler_running!() {
                     if task_handle.get_priority() < tcb.get_priority() {
                         set_current_task_handle!(self.clone());
@@ -503,7 +481,7 @@ impl TaskHandle {
             self.add_task_to_ready_list();
         }
         taskEXIT_CRITICAL!();
-        if GetSchedulerRunning!() {
+        if get_scheduler_running!() {
             let current_priority = get_current_task_priority!();
             if current_priority < tcb.priority {
                 taskYIELD_IF_USING_PREEMPTION!();
@@ -542,15 +520,15 @@ pub fn add_current_task_to_delayed_list(ticks_to_delay: TickType, can_block_inde
 
             if time < get_tick_count!() {
                 // Add the task to overflow delayed list
-                list::vListInsert(&OVERFLOW_DELAYED_TASK_LIST, &current_state_list_item);
+                list::list_insert(&OVERFLOW_DELAYED_TASK_LIST, &current_state_list_item);
             }
             else {
                 // Add the task to delayed list
-                list::vListInsert(&DELAYED_TASK_LIST, &current_state_list_item);
+                list::list_insert(&DELAYED_TASK_LIST, &current_state_list_item);
 
                 // Next task unblock time should be updated
-                if time < get_next_unblock_time!() {
-                    set_next_unblock_time!(time);
+                if time < get_next_task_unblock_time!() {
+                    set_next_task_unblock_time!(time);
                 }
             }
         }
@@ -565,34 +543,34 @@ pub fn add_current_task_to_delayed_list(ticks_to_delay: TickType, can_block_inde
 
         if time < get_tick_count!() {
             // Add the task to overflow delayed list
-            list::vListInsert(&OVERFLOW_DELAYED_TASK_LIST, &current_state_list_item);
+            list::list_insert(&OVERFLOW_DELAYED_TASK_LIST, &current_state_list_item);
         }
         else {
             // Add the task to delayed list
-            list::vListInsert(&DELAYED_TASK_LIST, &current_state_list_item);
+            list::list_insert(&DELAYED_TASK_LIST, &current_state_list_item);
 
             // Next task unblock time should be updated
-            if time < get_next_unblock_time!() {
-                set_next_unblock_time!(time);
+            if time < get_next_task_unblock_time!() {
+                set_next_task_unblock_time!(time);
             }
         }
     }
 }
 
 pub fn reset_next_task_unblock_time() {
-    if list::list_is_empty(&DELAYED_TASK_LIST) {
+    if list::listLIST_IS_EMPTY(&DELAYED_TASK_LIST) {
         // No tasks were blocked, so the next unblock time is set to portMAX_DELAY
-        set_next_unblock_time!(port::portMAX_DELAY);
+        set_next_task_unblock_time!(port::portMAX_DELAY);
     }
     else {
         // Get the handle of the first entry in the delayed task list
         let mut temp = get_owner_of_head_entry(&DELAYED_TASK_LIST);
-        set_next_unblock_time!(list::listGET_LIST_ITEM_VALUE(&temp.get_state_list_item()));
+        set_next_task_unblock_time!(list::listGET_LIST_ITEM_VALUE(&temp.get_state_list_item()));
     }
 }
 
 #[cfg(feature = "INCLUDE_vTaskDelete")]
-pub fn task_delete(task_to_delete: Option<TaskHandle>) {
+pub fn task_delete(task_to_delete: TaskHandle) {
     let tcb = GetTaskControlBlockWrite!(task_to_delete);
     
     taskENTER_CRITICAL!();
@@ -603,29 +581,29 @@ pub fn task_delete(task_to_delete: Option<TaskHandle>) {
             portRESET_READY_PRIORITY!(tcb.get_priority(), get_priority!());
         }
 
-        if list::get_list_item_container(tcb.get_event_list_item()).is_some() {
+        if list::get_list_item_container(&tcb.get_event_list_item()).is_some() {
             // Reset the event list item
             list::list_remove(tcb.get_event_list_item());
         }
 
         set_task_number!(get_task_number!() + 1);
 
-        if tcb == get_current_task_handle!() {
+        if *tcb == *GetTaskControlBlockRead!(get_current_task_handle!()) {
             // If the task being deleted is the currently running task then
             // insert it end of the waiting termination list
-            list::list_insert_end(&TASKS_WAITING_TERMINATION, tcb.get_state_list_item());
+            list::list_insert_end(&TASKS_WAITING_TERMINATION, &tcb.get_state_list_item());
 
             // Add the number of deleted tasks waiting to be cleaned up
             set_deleted_tasks_waiting_clean_up!(get_deleted_tasks_waiting_clean_up!() + 1);
 
-            portPRE_TASK_DELETE_HOOK!();
+            portPRE_TASK_DELETE_HOOK!(tcb, get_yield_pending!());
         }
         else {
             // Decrease the number of tasks
             set_current_number_of_tasks!(get_current_number_of_tasks!() - 1);
 
             // Release the task's memory
-            let stack_pointer = GetTaskControlBlockRead!(tcb).stack_pointer;
+            let stack_pointer = tcb.stack_pointer;
             port::port_free(stack_pointer as *mut _);
 
             // Reset the next unblock time
@@ -645,7 +623,7 @@ pub fn is_task_suspended(task: &TaskHandle) -> bool {
         // The task is in the pending ready list
         if !list::is_contained_within(&PENDING_READY_LIST, &tcb.get_event_list_item()) {
             // The task is not waiting for an event
-            if list::get_list_item_container(tcb.get_event_list_item()).is_some() {
+            if list::get_list_item_container(&tcb.get_event_list_item()).is_some() {
                 result = true;
             }
         }

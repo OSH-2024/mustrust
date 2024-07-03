@@ -1,8 +1,9 @@
 use crate::list::ListLink;
 use crate::port::{BaseType, TickType, UBaseType};
-use crate::task_control::TaskHandle;
+use crate::tasks::*;
 use crate::*;
-use no_std_async::rwlock::RwLock;
+use crate::rwlock::*;
+use lazy_static::*;
 
 /* Some global variables. */
 pub static mut TICK_COUNT: TickType = 0;
@@ -304,14 +305,14 @@ macro_rules! get_task_switched_in_time {
 #[macro_export]
 macro_rules! get_current_task_handle_wrapped {
     () => {
-        crate::task_global::CURRENT_TCB.read().unwrap().as_ref()
+        crate::task_global::CURRENT_TCB.read().as_ref()
     };
 }
 
 #[macro_export]
 macro_rules! get_current_task_handle {
     () => {
-        crate::task_global::CURRENT_TCB.read().unwrap().as_ref().unwrap().clone()
+        crate::task_global::CURRENT_TCB.read().as_ref().unwrap().clone()
     };
 }
 
@@ -319,7 +320,7 @@ macro_rules! get_current_task_handle {
 macro_rules! set_current_task_handle {
     ($cloned_new_task: expr) => {
         // info!("CURRENT_TCB changed!");
-        *(crate::task_global::CURRENT_TCB).write().unwrap() = Some($cloned_new_task)
+        *(crate::task_global::CURRENT_TCB).write() = Some($cloned_new_task)
     };
 }
 
@@ -348,8 +349,8 @@ macro_rules! taskCHECK_FOR_STACK_OVERFLOW {
 macro_rules! switch_delayed_list {
     () => {
         unsafe {
-            let mut delayed = DELAYED_TASK_LIST.write().unwrap();
-            let mut overflowed = OVERFLOW_DELAYED_TASK_LIST.write().unwrap();
+            let mut delayed = DELAYED_TASK_LIST.write();
+            let mut overflowed = OVERFLOW_DELAYED_TASK_LIST.write();
             let tmp = (*delayed).clone();
             *delayed = (*overflowed).clone();
             *overflowed = tmp;

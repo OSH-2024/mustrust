@@ -2,19 +2,38 @@
 #![no_main]
 #![feature(asm)]
 #![feature(core_intrinsics)]
+#![feature(alloc_error_handler)]
 
 mod bindings;
 mod FreeRTOS_tick_config;
+mod kernel;
+mod list;
 mod port;
 mod projdefs;
+mod queue;
+mod queue_api;
+mod queue_h;
+mod rwlock;
+mod semaphore;
+mod task_global;
+mod task_queue;
 mod tasks;
+mod trace;
 mod uart;
+
+extern crate alloc;
 
 use core;
 use core::arch::asm;
 use core::panic::PanicInfo;
 use cty;
 use crate::uart::*;
+
+use embedded_alloc::Heap;
+
+#[global_allocator]
+static HEAP: Heap = Heap::empty();
+
 
 #[no_mangle]
 pub extern "C" fn io_halt() {
