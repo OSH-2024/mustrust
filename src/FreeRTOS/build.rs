@@ -2,6 +2,7 @@ extern crate cc;
 
 fn main() {
 	cc::Build::new()
+        .file("c_src/mmu.c")
         .file("c_src/list.c")
         .file("c_src/queue.c")
         .file("c_src/tasks.c")

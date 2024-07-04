@@ -1,32 +1,41 @@
-use crate::linkedlist::*;
-use crate::mmuconf::*;
+use crate::bindings::*;
 
 static mut seed: u32 = 114514;
+const times: u32 = 8;
+const disk_size: u32 = 4096 * times;
 
 fn gen_rand() -> u32 {
-    seed ^= seed << 13;
-    seed ^= seed >> 17;
-    seed ^= seed << 5;
-    seed
+    unsafe {
+        seed ^= seed << 13;
+        seed ^= seed >> 17;
+        seed ^= seed << 5;
+        seed
+    }
 }
 
-fn random_initialize(l: u32, r: u32) {
-    for i in 0..disk_size {
-        disk[i] = gen_rand() % (r - l + 1) + l;
+pub fn random_initialize(l: u32, r: u32) {
+    unsafe {
+        for i in 0..disk_size {
+            disk[i as usize] = (gen_rand() % (r - l + 1) + l) as i32;
+        }
     }
 }
 
 fn swap(i: i32, j: i32) {
-    let tmp = read_memory(i); // int tmp = mem[i];
-    write_memory(i, read_memory(j)); // mem[i] = mem[j];
-    write_memory(j, tmp); // mem[j] = tmp;
+    unsafe {
+        let tmp = read_memory(i); // int tmp = mem[i];
+        write_memory(i, read_memory(j)); // mem[i] = mem[j];
+        write_memory(j, tmp); // mem[j] = tmp;
+    }
 }
 
-fn bubble_sort() {
-    for i in 0..disk_size - 1 {
-        for j in 0..disk_size - i - 1 {
-            if read_memory(j) > read_memory(j + 1) {
-                swap(j, j + 1);
+pub fn bubble_sort() {
+    unsafe {
+        for i in 0..disk_size - 1 {
+            for j in 0..disk_size - i - 1 {
+                if read_memory(j as i32) > read_memory(j as i32 + 1) {
+                    swap(j as i32, j as i32 + 1);
+                }
             }
         }
     }
