@@ -47,10 +47,10 @@ int pTraverseList(LINKNODE);
 #define virtual_space (2048 * times) //虚拟地址空间
 #define page_table_size (virtual_space / page_size) //页表大小
 #define TLB_size (4 * times) //TLB大小
-#define time_TLB_access 1e-9   //访问TLB时间
-#define time_memory_access 1e-7  //访问memory时间  
-#define	time_cach_access 1e-7	//访问cach时间
-#define time_disk_access 1e-3    //访问硬盘时间
+#define time_TLB_access 1   //访问TLB时间
+#define time_memory_access 100  //访问memory时间  
+#define	time_cach_access 100	//访问cach时间
+#define time_disk_access 1000000    //访问硬盘时间
 #define start_address 0 //程序数据存放起始地址
 
 extern int memory[memory_size];
@@ -62,7 +62,7 @@ extern long int TLB_miss;
 extern long int memory_hit;
 extern long int memory_miss;
 extern int replacement_number_FIFO;
-extern float time_cost;
+extern long int time_cost;
 
 enum memory_operation {
 	read = 0,
@@ -80,6 +80,10 @@ int read_memory(int virtual_address);
 void write_memory(int virtual_address, int data);
 int TLB_search(int virtual_address, enum memory_operation operation);
 int TLB_update(int page_number, int frame_number);
-void wirte_back();
+void write_back();
+
+void initialize_tcb();
+void uninitialize_tcb();
+void initialize_list();
 
 #endif

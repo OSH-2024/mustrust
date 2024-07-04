@@ -55,9 +55,33 @@ pub fn uart_puthex(v: u64) {
 
 pub fn uart_putdec(v: u64) {
     let digits = "0123456789".as_bytes();
+    if (v == 0) {
+        uart_putchar(b'0');
+        return;
+    }
     let mut v = v;
-    let mut w = 1;
+    let mut w = 1u64;
     while w <= v {
+        w *= 10;
+    }
+    w /= 10;
+
+    while w > 0 {
+        uart_putchar(digits[(v / w) as usize]);
+        v %= w;
+        w /= 10;
+    }
+}
+
+pub fn uart_putdec_sized(v: u64, len: i32) {
+    let digits = "0123456789".as_bytes();
+    if (v == 0) {
+        uart_putchar(b'0');
+        return;
+    }
+    let mut v = v;
+    let mut w = 1u64;
+    for _ in 0..len {
         w *= 10;
     }
     w /= 10;

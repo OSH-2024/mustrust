@@ -45,25 +45,35 @@ pub extern "C" fn io_halt() {
     }
 }
 
+fn print_rate(a: u64, b: u64) {
+    uart_putdec(a);
+    uart_puts(" / ");
+    uart_putdec(b);
+    uart_puts(" (");
+    let epct = a * 100000000 / b;
+    uart_putdec(epct / 1000000);
+    uart_puts(".");
+    uart_putdec_sized(epct % 1000000, 6);
+    uart_puts("%)\n");
+}
+
 pub extern "C" fn TaskA(pvParameters: *mut cty::c_void) {
     unsafe {
         uart_puts("MMU Testing task start\n");
         uart_puts("Task 1. Bubble sort test\n");
         mmutest::random_initialize(0, 114514);
+        bindings::initialize_tcb();
+        bindings::initialize_list();
+        uart_puts("Initialized array.\n");
         mmutest::bubble_sort();
+        bindings::write_back();
         uart_puts("Task 1 ended.\n");
         uart_puts("TLB hit rate: ");
-        uart_putdec(bindings::TLB_hit as u64);
-        uart_puts(" / ");
-        uart_putdec((bindings::TLB_hit + bindings::TLB_miss) as u64);
-        uart_puts("\n");
+        print_rate(bindings::TLB_hit as u64, (bindings::TLB_hit + bindings::TLB_miss) as u64);
         uart_puts("Memory hit rate: ");
-        uart_putdec(bindings::memory_hit as u64);
-        uart_puts(" / ");
-        uart_putdec((bindings::memory_hit + bindings::memory_miss) as u64);
-        uart_puts("\n");
+        print_rate(bindings::memory_hit as u64, (bindings::memory_hit + bindings::memory_miss) as u64);
         uart_puts("Estimated execution time: ");
-        uart_putdec((bindings::time_cost * 1e9) as u64);
+        uart_putdec(bindings::time_cost as u64);
         uart_puts("ns\n");
     }
 }
@@ -93,7 +103,6 @@ pub extern "C" fn main() -> ! {
         uart_init();
         uart_puts("qemu exit: Ctrl-A x / qemu monitor: Ctrl-A c\n");
         uart_puts("Program by MUSTRUST, USTC OSH 2024\n");
-        uart_puts("Start MMU Simulation\n");
         bindings::xTaskCreate(Some(TaskA), task_name, 512, 0 as *mut cty::c_void, bindings::tskIDLE_PRIORITY as u64, &mut task_a);
         timer = bindings::xTimerCreate(timer_name, (10 / portTICK_RATE_MS!()) as u64, bindings::pdTRUE as u64, 0 as *mut cty::c_void, Some(interval_func));
         if timer != (0 as *mut cty::c_void) {

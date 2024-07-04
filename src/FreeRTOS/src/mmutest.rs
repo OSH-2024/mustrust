@@ -1,8 +1,10 @@
 use crate::bindings::*;
+use crate::uart::*;
 
-static mut seed: u32 = 114514;
+static mut seed: u32 = 1919810;
 const times: u32 = 8;
 const disk_size: u32 = 4096 * times;
+const virtual_space: u32 = 2048 * times;
 
 fn gen_rand() -> u32 {
     unsafe {
@@ -31,8 +33,8 @@ fn swap(i: i32, j: i32) {
 
 pub fn bubble_sort() {
     unsafe {
-        for i in 0..disk_size - 1 {
-            for j in 0..disk_size - i - 1 {
+        for i in 0..virtual_space - 1 {
+            for j in 0..virtual_space - i - 1 {
                 if read_memory(j as i32) > read_memory(j as i32 + 1) {
                     swap(j as i32, j as i32 + 1);
                 }

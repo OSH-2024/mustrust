@@ -1,16 +1,17 @@
 #include "mmu.h"
+#include "projdefs.h"
+#include "portmacro.h"
 
 LINKNODE LRU_list;
 LINKNODE FIFO_list;
 
-
 void pInitList(LINKNODE *pHead)
 {
-	*pHead = (LINKNODE)malloc(sizeof(NODE));
+	*pHead = (LINKNODE)pvPortMalloc(sizeof(NODE));
 	(*pHead)->next = 0;
 };
 
-//节点位置从1开始，头节点位置为0
+
 int pInsertElem(LINKNODE *pHead, LINKNODE s, int posi)
 {
 	LINKNODE p;
@@ -34,14 +35,14 @@ int pInsertElem(LINKNODE *pHead, LINKNODE s, int posi)
 	return -1;
 };
 
-//从将元素从当前位置移动到第一个位置
+
 int pMovetoFirst(LINKNODE *pHead, int e)
 {
 	LINKNODE p = *pHead;
 	LINKNODE q;
 	if (*pHead == 0) return -1;
 	while ((p != 0) && (p->next->frame_number != e)) p = p->next;
-	if (p == 0) return -1;//无元素e
+	if (p == 0) return -1;
 	q = p->next;
 	p->next = q->next;
 	q->next = (*pHead)->next;
@@ -49,7 +50,7 @@ int pMovetoFirst(LINKNODE *pHead, int e)
 	return 1;
 }
 
-//得到末尾节点的指针
+
 LINKNODE GetEndNode(LINKNODE pHead)
 {
 	LINKNODE p = pHead;
@@ -58,38 +59,37 @@ LINKNODE GetEndNode(LINKNODE pHead)
 	return p;
 }
 
-int pTraverseList(LINKNODE pHead)
-{
-	LINKNODE p;
-	if (pHead == 0)
-	{
-		return -1;
-	}
-	p = pHead->next;
-	while (p != 0)
-	{
-		printf("%d ", p->frame_number);
-		p = p->next;
-	}
-	return 1;
-}
-
 int memory[memory_size];
 int disk[disk_size];
 TCB *currentTCB;
 line TLB[TLB_size];
 
 int replacement_number_FIFO;
-float time_cost;
+long int time_cost;
 long int TLB_hit;
 long int TLB_miss;
 long int memory_hit;
 long int memory_miss;
 
+void initialize_tcb() {
+    currentTCB = (TCB*)pvPortMalloc(sizeof(TCB));
+    page_table_init(currentTCB);
+}
+
+void uninitialize_tcb() {
+    vPortFree(currentTCB);
+}
+
 int read_to_memory(int memory_frame, int disk_start_address)
 {
 	int memory_address, disk_address;
-	for (int i = 0; i < page_size; i++)
+	for (int i = 0; i < page_size; i += 2)
+	{
+		memory_address = memory_frame * page_size + i;
+		disk_address = disk_start_address + i;
+		memory[memory_address] = disk[disk_address];
+	}
+	for (int i = 1; i < page_size; i += 2)
 	{
 		memory_address = memory_frame * page_size + i;
 		disk_address = disk_start_address + i;
@@ -102,7 +102,13 @@ int read_to_memory(int memory_frame, int disk_start_address)
 int write_to_disk(int memory_frame, int disk_start_address)
 {
 	int memory_address, disk_address;
-	for (int i = 0; i < page_size; i++)
+	for (int i = 0; i < page_size; i += 2)
+	{
+		memory_address = memory_frame * page_size + i;
+		disk_address = disk_start_address + i;
+		disk[disk_address] = memory[memory_address];
+	}
+	for (int i = 1; i < page_size; i += 2)
 	{
 		memory_address = memory_frame * page_size + i;
 		disk_address = disk_start_address + i;
@@ -114,7 +120,7 @@ int write_to_disk(int memory_frame, int disk_start_address)
 
 void page_table_init(TCB *tcb)
 {
-	tcb->page_table = (entry*)malloc(page_table_size * sizeof(entry));
+	tcb->page_table = (entry*)pvPortMalloc(page_table_size * sizeof(entry));
 	for (int i = 0; i < page_table_size; i++)
 	{
 		tcb->page_table[i].dirty = 0;
@@ -122,7 +128,6 @@ void page_table_init(TCB *tcb)
 		tcb->page_table[i].frame_number = 0;
 		tcb->page_table[i].disk_address = start_address + page_size * i;
 	}
-	//������е�һ�������ݷ����ڴ�
 	for (int i = 0; i < memory_frame_size; i++)
 	{
 		read_to_memory(i, tcb->page_table[i].disk_address);
@@ -131,13 +136,13 @@ void page_table_init(TCB *tcb)
 	}
 }
 
-int address_map(int virtual_address, enum memory_operation operation)//operation��ʾ����д
+int address_map(int virtual_address, enum memory_operation operation)
 {
 	int page_number = virtual_address / page_size;
 	int offset = virtual_address % page_size;
 	int physical_address;
 #if(1 == useTLB)
-	if ((physical_address = TLB_search(virtual_address, operation)) != -1)//�������
+	if ((physical_address = TLB_search(virtual_address, operation)) != -1)
 	{
 		TLB_hit++;
 		memory_hit++;
@@ -145,7 +150,7 @@ int address_map(int virtual_address, enum memory_operation operation)//operation
 	}
 	TLB_miss++;
 #endif
-	//��ѯ����
+	
 	time_cost += time_memory_access;
 	if (!currentTCB->page_table[page_number].valid)
 	{
@@ -162,7 +167,7 @@ int address_map(int virtual_address, enum memory_operation operation)//operation
 		currentTCB->page_table[page_number].dirty = 1;
 	}
 #if(1 == useTLB)
-	TLB_update(page_number, currentTCB->page_table[page_number].frame_number);//���¿��
+	TLB_update(page_number, currentTCB->page_table[page_number].frame_number);
 #endif
 	return physical_address;
 	
@@ -177,36 +182,36 @@ void pageFault(entry * faultPage, int page_number)
 	LINKNODE endNode = FIFO_list;
 #endif
 #if(1 == useTLB)
-	if (endNode->task_belonging == currentTCB)//��������¿�����Ҫ��д����е���λ���Լ��޸Ŀ������
+	if (endNode->task_belonging == currentTCB)
 	{
 		for (int i = 0; i < TLB_size; i++)
 		{
-			if (TLB[i].valid == 1 && TLB[i].page_number == endNode->page_number)//��Ҫ������ҳ���ڿ����
+			if (TLB[i].valid == 1 && TLB[i].page_number == endNode->page_number)
 			{
 				TLB[i].valid = 0;
 				if (TLB[i].dirty == 1)
 				{
-					((currentTCB->page_table) + (endNode->page_number))->dirty = 1;//������е�dirtyд������
+					((currentTCB->page_table) + (endNode->page_number))->dirty = 1;
 				}
 				break;
 			}
 		}
 	}
 #endif
-	//����
+	
 	if (((endNode->task_belonging->page_table) + (endNode->page_number))->dirty == 1)
 	{
 		int disk_address_out = ((endNode->task_belonging->page_table) + (endNode->page_number))->disk_address;
 		write_to_disk(endNode->frame_number, disk_address_out);
 	}
 	((endNode->task_belonging->page_table) + (endNode->page_number))->valid = 0;
-	//����
+	
 	int disk_address_in = faultPage->disk_address;
 	read_to_memory(endNode->frame_number, disk_address_in);
 	faultPage->dirty = 0;
 	faultPage->valid = 1;
 	faultPage->frame_number = endNode->frame_number;
-	//���½ڵ��Ӧ֡����Ϣ
+	
 	endNode->task_belonging = currentTCB;
 	endNode->page_number = page_number;
 #if(1 == ReplacementStrategy)
@@ -220,7 +225,7 @@ void LRU_list_init(LINKNODE *list)
 	pInitList(list);
 	for (int i = 0; i < memory_frame_size; i++)
 	{
-		s = (LINKNODE)malloc(sizeof(NODE));
+		s = (LINKNODE)pvPortMalloc(sizeof(NODE));
 		s->task_belonging = currentTCB;
 		s->page_number = i;
 		s->frame_number = i;
@@ -245,21 +250,21 @@ void write_memory(int virtual_address, int data)
 
 
 
-int TLB_search(int virtual_address, enum memory_operation operation)//������з���������ַ�����򷵻�-1
+int TLB_search(int virtual_address, enum memory_operation operation)
 {
 	int page_number = virtual_address / page_size;
 	int offset = virtual_address % page_size;
-	int physical_address = -1;//���������-1��˵��û��ƥ�䵽
+	int physical_address = -1;
 	for (int i = 0; i < TLB_size; i++)
 	{
-		if (TLB[i].page_number == page_number && TLB[i].valid == 1)//�ɹ�ƥ��
+		if (TLB[i].page_number == page_number && TLB[i].valid == 1)
 		{
 			TLB[i].ref = 1;
 			if (operation == write)
 			{
 				TLB[i].dirty = 1;
 			}
-			//cout << i << " ";
+			
 			physical_address = TLB[i].frame_number * page_size + offset;
 			break;
 		}
@@ -270,7 +275,7 @@ int TLB_search(int virtual_address, enum memory_operation operation)//����
 
 int TLB_update(int page_number, int frame_number)
 {
-	for (int i = 0; i < TLB_size; i++)//Ѱ��Ӧ�ñ��滻����
+	for (int i = 0; i < TLB_size; i++)
 	{
 		if (TLB[i].valid == 0)
 		{
@@ -282,7 +287,7 @@ int TLB_update(int page_number, int frame_number)
 			return 1;
 		}
 	}
-	for (int i = 0; i < TLB_size; i++)//Ѱ��Ӧ�ñ��滻����
+	for (int i = 0; i < TLB_size; i++)
 	{
 		if (TLB[i].valid == 1 && TLB[i].ref == 1 && i != TLB_size - 1)
 		{
@@ -292,7 +297,7 @@ int TLB_update(int page_number, int frame_number)
 		{
 			if (TLB[i].valid == 1 && TLB[i].dirty == 1)
 			{
-				((currentTCB->page_table) + (TLB[i].page_number))->dirty = 1;//������е�dirtyд������
+				((currentTCB->page_table) + (TLB[i].page_number))->dirty = 1;
 			}
 			TLB[i].page_number = page_number;
 			TLB[i].frame_number = frame_number;
@@ -305,13 +310,13 @@ int TLB_update(int page_number, int frame_number)
 	return 1;
 }
 
-void wirte_back()
+void write_back()
 {
 	for (int i = 0; i < TLB_size; i++)
 	{
 		if (TLB[i].valid == 1 && TLB[i].dirty == 1)
 		{
-			((currentTCB->page_table) + (TLB[i].page_number))->dirty = 1;//������е�dirtyд������
+			((currentTCB->page_table) + (TLB[i].page_number))->dirty = 1;
 		}
 	}
 	
@@ -331,7 +336,7 @@ void FIFO_list_init(LINKNODE *list)
 	pInitList(list);
 	for (int i = 0; i < memory_frame_size; i++)
 	{
-		s = (LINKNODE)malloc(sizeof(NODE));
+		s = (LINKNODE)pvPortMalloc(sizeof(NODE));
 		s->task_belonging = currentTCB;
 		s->page_number = i;
 		s->frame_number = i;
@@ -342,4 +347,10 @@ void FIFO_list_init(LINKNODE *list)
 	*list = (*list)->next;
 }
 
-
+void initialize_list() {
+    #if ReplacementStrategy == 0
+    LRU_list_init(&LRU_list);
+    #elif ReplacementStrategy == 1
+    FIFO_list_init(&FIFO_list);
+    #endif
+}
