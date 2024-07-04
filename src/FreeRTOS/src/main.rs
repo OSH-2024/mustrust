@@ -59,22 +59,80 @@ fn print_rate(a: u64, b: u64) {
 
 pub extern "C" fn TaskA(pvParameters: *mut cty::c_void) {
     unsafe {
-        uart_puts("MMU Testing task start\n");
-        uart_puts("Task 1. Bubble sort test\n");
-        mmutest::random_initialize(0, 114514);
+        uart_puts("[TaskA] MMU Testing task start\n");
+        uart_puts("[TaskA] Task 1. Bubble sort test\n");
+        mmutest::random_initialize(0, 1145141919);
+        bindings::initialize_stat();
         bindings::initialize_tcb();
         bindings::initialize_list();
-        uart_puts("Initialized array.\n");
+        uart_puts("[TaskA] Initialized array.\n");
         mmutest::bubble_sort();
         bindings::write_back();
-        uart_puts("Task 1 ended.\n");
-        uart_puts("TLB hit rate: ");
+        uart_puts("[TaskA] Task 1 ended.\n");
+        bindings::uninitialize_tcb();
+        uart_puts("[TaskA] TLB hit rate: ");
         print_rate(bindings::TLB_hit as u64, (bindings::TLB_hit + bindings::TLB_miss) as u64);
-        uart_puts("Memory hit rate: ");
+        uart_puts("[TaskA] Memory hit rate: ");
         print_rate(bindings::memory_hit as u64, (bindings::memory_hit + bindings::memory_miss) as u64);
-        uart_puts("Estimated execution time: ");
+        uart_puts("[TaskA] Estimated execution time: ");
         uart_putdec(bindings::time_cost as u64);
         uart_puts("ns\n");
+        uart_puts("[TaskA] ====================\n");
+        uart_puts("[TaskA] Task 2. Quick sort test\n");
+        mmutest::random_initialize(0, 1145141919);
+        bindings::initialize_stat();
+        bindings::initialize_tcb();
+        bindings::initialize_list();
+        uart_puts("[TaskA] Initialized array.\n");
+        mmutest::quick_sort(0, mmutest::virtual_space as i32 - 1);
+        bindings::write_back();
+        uart_puts("[TaskA] Task 2 ended.\n");
+        bindings::uninitialize_tcb();
+        uart_puts("[TaskA] TLB hit rate: ");
+        print_rate(bindings::TLB_hit as u64, (bindings::TLB_hit + bindings::TLB_miss) as u64);
+        uart_puts("[TaskA] Memory hit rate: ");
+        print_rate(bindings::memory_hit as u64, (bindings::memory_hit + bindings::memory_miss) as u64);
+        uart_puts("[TaskA] Estimated execution time: ");
+        uart_putdec(bindings::time_cost as u64);
+        uart_puts("ns\n");
+        uart_puts("[TaskA] ====================\n");
+        uart_puts("[TaskA] Test completed.\n");
+        loop {}
+    }
+}
+
+pub extern "C" fn TaskB(pvParameters: *mut cty::c_void) {
+    unsafe {
+        uart_puts("[TaskB] Timer task start\n");
+        loop {
+            uart_puts("[TaskB] Current timer: ");
+            uart_putdec(bindings::xTaskGetTickCount());
+		    uart_puts("\n");
+            bindings::vTaskDelay(514 / portTICK_RATE_MS!());
+        }
+    }
+}
+
+pub extern "C" fn TaskC(pvParameters: *mut cty::c_void) {
+    let s1 = "Never gonna give you up";
+    let s2 = "Never gonna let you down";
+    let s3 = "Never gonna run around and desert you";
+    unsafe {
+        uart_puts("[TaskC] Ni bei pian le!\n");
+        loop {
+            uart_puts("[TaskC] ");
+            uart_puts(s1);
+            uart_puts("\n");
+            bindings::vTaskDelay(1958 / portTICK_RATE_MS!());
+            uart_puts("[TaskC] ");
+            uart_puts(s2);
+            uart_puts("\n");
+            bindings::vTaskDelay(1958 / portTICK_RATE_MS!());
+            uart_puts("[TaskC] ");
+            uart_puts(s3);
+            uart_puts("\n");
+            bindings::vTaskDelay(1958 / portTICK_RATE_MS!());
+        }
     }
 }
 
@@ -96,15 +154,21 @@ pub extern "C" fn interval_func(pxTimer: bindings::TimerHandle_t) {
 
 #[no_mangle]
 pub extern "C" fn main() -> ! {
-    let task_name = b"TaskA\0".as_ptr() as *const cty::c_char;
-    let timer_name = b"print_every_10ms\0".as_ptr() as *const cty::c_char;
+    let task_name_a = b"TaskA\0".as_ptr() as *const cty::c_char;
+    let task_name_b = b"TaskB\0".as_ptr() as *const cty::c_char;
+    let task_name_c = b"TaskC\0".as_ptr() as *const cty::c_char;
+    let timer_name_a = b"print_every_10ms\0".as_ptr() as *const cty::c_char;
     unsafe {
         let mut task_a: bindings::TaskHandle_t = 0 as *mut cty::c_void;
+        let mut task_b: bindings::TaskHandle_t = 0 as *mut cty::c_void;
+        let mut task_c: bindings::TaskHandle_t = 0 as *mut cty::c_void;
         uart_init();
         uart_puts("qemu exit: Ctrl-A x / qemu monitor: Ctrl-A c\n");
         uart_puts("Program by MUSTRUST, USTC OSH 2024\n");
-        bindings::xTaskCreate(Some(TaskA), task_name, 512, 0 as *mut cty::c_void, bindings::tskIDLE_PRIORITY as u64, &mut task_a);
-        timer = bindings::xTimerCreate(timer_name, (10 / portTICK_RATE_MS!()) as u64, bindings::pdTRUE as u64, 0 as *mut cty::c_void, Some(interval_func));
+        bindings::xTaskCreate(Some(TaskA), task_name_a, 512, 0 as *mut cty::c_void, bindings::tskIDLE_PRIORITY as u64, &mut task_a);
+        bindings::xTaskCreate(Some(TaskB), task_name_b, 512, 0 as *mut cty::c_void, bindings::tskIDLE_PRIORITY as u64, &mut task_b);
+        bindings::xTaskCreate(Some(TaskC), task_name_c, 512, 0 as *mut cty::c_void, bindings::tskIDLE_PRIORITY as u64, &mut task_c);
+        timer = bindings::xTimerCreate(timer_name_a, (10 / portTICK_RATE_MS!()) as u64, bindings::pdTRUE as u64, 0 as *mut cty::c_void, Some(interval_func));
         if timer != (0 as *mut cty::c_void) {
             bindings::xTimerStart(timer, 0);
         }
@@ -121,6 +185,7 @@ pub extern "C" fn _exit() -> ! {
 #[no_mangle]
 #[panic_handler]
 fn panic(_info: &PanicInfo) -> ! {
+    uart_puts("panic!\n");
     loop {}
 }
 

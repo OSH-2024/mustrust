@@ -9,7 +9,7 @@ void pInitList(LINKNODE *pHead)
 {
 	*pHead = (LINKNODE)pvPortMalloc(sizeof(NODE));
 	(*pHead)->next = 0;
-};
+}
 
 
 int pInsertElem(LINKNODE *pHead, LINKNODE s, int posi)
@@ -33,7 +33,7 @@ int pInsertElem(LINKNODE *pHead, LINKNODE s, int posi)
 		counter++;
 	}
 	return -1;
-};
+}
 
 
 int pMovetoFirst(LINKNODE *pHead, int e)
@@ -64,12 +64,19 @@ int disk[disk_size];
 TCB *currentTCB;
 line TLB[TLB_size];
 
-int replacement_number_FIFO;
 long int time_cost;
 long int TLB_hit;
 long int TLB_miss;
 long int memory_hit;
 long int memory_miss;
+
+void initialize_stat() {
+    time_cost = 0;
+    TLB_hit = 0;
+    TLB_miss = 0;
+    memory_hit = 0;
+    memory_miss = 0;
+}
 
 void initialize_tcb() {
     currentTCB = (TCB*)pvPortMalloc(sizeof(TCB));
@@ -160,7 +167,7 @@ int address_map(int virtual_address, enum memory_operation operation)
 	else memory_hit++;
 	physical_address = currentTCB->page_table[page_number].frame_number * page_size + offset;
 #if(0 == ReplacementStrategy)
-	pMovetoFirst(LRU_list, currentTCB->page_table[page_number].frame_number);
+	pMovetoFirst(&LRU_list, currentTCB->page_table[page_number].frame_number);
 #endif
 	if (operation == write)
 	{

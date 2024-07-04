@@ -61,7 +61,6 @@ extern long int TLB_hit;
 extern long int TLB_miss;
 extern long int memory_hit;
 extern long int memory_miss;
-extern int replacement_number_FIFO;
 extern long int time_cost;
 
 enum memory_operation {
@@ -85,5 +84,6 @@ void write_back();
 void initialize_tcb();
 void uninitialize_tcb();
 void initialize_list();
+void initialize_stat();
 
 #endif

@@ -4,7 +4,7 @@ use crate::uart::*;
 static mut seed: u32 = 1919810;
 const times: u32 = 8;
 const disk_size: u32 = 4096 * times;
-const virtual_space: u32 = 2048 * times;
+pub const virtual_space: u32 = 2048 * times;
 
 fn gen_rand() -> u32 {
     unsafe {
@@ -40,5 +40,24 @@ pub fn bubble_sort() {
                 }
             }
         }
+    }
+}
+
+pub fn quick_sort(l: i32, r: i32) {
+    unsafe {
+        if l > r {
+            return;
+        }
+        let mut i = l;
+        let mut k = read_memory(r);
+        for j in l..r {
+            if read_memory(j) < read_memory(r) {
+                swap(i, j);
+                i += 1;
+            }
+        }
+        swap(i, r);
+        quick_sort(l, i - 1);
+        quick_sort(i + 1, r);
     }
 }
