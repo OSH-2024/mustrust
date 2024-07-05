@@ -136,6 +136,41 @@ pub extern "C" fn TaskC(pvParameters: *mut cty::c_void) {
     }
 }
 
+static mut pi_f: [u32; 35000] = [2000; 35000];
+
+pub extern "C" fn TaskD(pvParameters: *mut cty::c_void) {
+    unsafe {
+        uart_puts("[TaskD] Pi first 10000 digits calculating task start\n");
+        let a = 10000;
+        let mut e = 0;
+        let mut c = 35000;
+        let mut cnt = 0;
+        while c > 0 {
+            let mut d = 0;
+            let mut b = c;
+            while b > 0 {
+                d = d * b + pi_f[b as usize - 1] * a;
+                let g = 2 * b - 1;
+                pi_f[b as usize - 1] = d % g;
+                d /= g;
+                b -= 1;
+            }
+            uart_puts("[TaskD] Pi[");
+            uart_putdec(cnt);
+            uart_puts(":");
+            uart_putdec(cnt + 3);
+            uart_puts("] = ");
+            uart_putdec_sized((e + d / a) as u64, 4);
+            uart_puts("\n");
+            bindings::vTaskDelay(300 / portTICK_RATE_MS!());
+            e = d % a;
+            c -= 14;
+            cnt += 4;
+        }
+        loop {}
+    }
+}
+
 static mut timer: bindings::TimerHandle_t = 0 as *mut cty::c_void;
 static mut count: cty::uint32_t = 0;
 
@@ -157,17 +192,20 @@ pub extern "C" fn main() -> ! {
     let task_name_a = b"TaskA\0".as_ptr() as *const cty::c_char;
     let task_name_b = b"TaskB\0".as_ptr() as *const cty::c_char;
     let task_name_c = b"TaskC\0".as_ptr() as *const cty::c_char;
+    let task_name_d = b"TaskD\0".as_ptr() as *const cty::c_char;
     let timer_name_a = b"print_every_10ms\0".as_ptr() as *const cty::c_char;
     unsafe {
         let mut task_a: bindings::TaskHandle_t = 0 as *mut cty::c_void;
         let mut task_b: bindings::TaskHandle_t = 0 as *mut cty::c_void;
         let mut task_c: bindings::TaskHandle_t = 0 as *mut cty::c_void;
+        let mut task_d: bindings::TaskHandle_t = 0 as *mut cty::c_void;
         uart_init();
         uart_puts("qemu exit: Ctrl-A x / qemu monitor: Ctrl-A c\n");
         uart_puts("Program by MUSTRUST, USTC OSH 2024\n");
         bindings::xTaskCreate(Some(TaskA), task_name_a, 512, 0 as *mut cty::c_void, bindings::tskIDLE_PRIORITY as u64, &mut task_a);
         bindings::xTaskCreate(Some(TaskB), task_name_b, 512, 0 as *mut cty::c_void, bindings::tskIDLE_PRIORITY as u64, &mut task_b);
         bindings::xTaskCreate(Some(TaskC), task_name_c, 512, 0 as *mut cty::c_void, bindings::tskIDLE_PRIORITY as u64, &mut task_c);
+        bindings::xTaskCreate(Some(TaskD), task_name_c, 512, 0 as *mut cty::c_void, bindings::tskIDLE_PRIORITY as u64, &mut task_d);
         timer = bindings::xTimerCreate(timer_name_a, (10 / portTICK_RATE_MS!()) as u64, bindings::pdTRUE as u64, 0 as *mut cty::c_void, Some(interval_func));
         if timer != (0 as *mut cty::c_void) {
             bindings::xTimerStart(timer, 0);
