@@ -224,32 +224,83 @@ Rust版本的链表项和链表的数据结构如下：
 ```rust
 pub struct xLIST_ITEM
 {
-    // 辅助值，用于帮助结点做顺序排列
-	xItemValue: TickType,	
-    // 双向引用	
-	pxNext: WeakItemLink,     
-    // 双向引用
-	pxPrevious: WeakItemLink,	
-	// 指向拥有该结点的内核对象，通常是TaskControlBlock
-    pvOwner: Weak<RwLock<TaskControlBlock>>,										
-	// 指向该节点所在的链表 双向引用
-    pvContainer: Weak<RwLock<List_t>>			
+	xItemValue: TickType,	// 辅助值，用于帮助结点做顺序排列
+	
+	pxNext: WeakItemLink,	// 双向引用
+	pxPrevious: WeakItemLink,	// 双向引用
+    pvOwner: Weak<RwLock<TaskControlBlock>>,	// 指向拥有该结点的内核对象
+    pvContainer: Weak<RwLock<List_t>>,	// 指向该节点所在的链表 双向引用
 }
 
 pub struct xLIST
 {
-    // 链表节点计数器
-    uxNumberOfItems: UBaseType,
-    // 链表节点索引指针
-	pxIndex: WeakItemLink,			
-	// 链表最后一个节点 单向引用
-    xListEnd: ItemLink						
+    uxNumberOfItems: UBaseType,	// 链表节点计数器
+	pxIndex: WeakItemLink,	// 链表节点索引指针			
+    xListEnd: ItemLink,	// 链表最后一个节点 单向引用					
 }
 ```
 
-然后，我们采取将源码的函数进行拆分为各种简单的函数或方法，然后整合的方式来实现`list`模块的功能。
+然后，我们采取将源码的函数进行拆分为各种简单的函数或方法，然后整合的方式来实现`list`模块的功能：
 
+1. `xLIST_ITEM::default`：`xLIST_ITEM`结构体的默认构造函数，用于初始化一个链表项，其中`xItemValue`设置为`portMAX_DELAY`，表示这个项在排序时会被放在链表的最末尾。
+2. `xLIST_ITEM::new`：创建一个新的链表项，并设置其`xItemValue`。
+3. `xLIST_ITEM::set_value`：设置链表项的`xItemValue`。
+4. `xLIST_ITEM::owner`：设置链表项的拥有者，通常是一个任务控制块（`TaskControlBlock`）。
+5. `xLIST_ITEM::set_container`：设置链表项所属的容器，即它所在的链表。
+6. `xLIST_ITEM::remove`：从链表中移除一个项。
+7. `new_list_item`：创建一个新的链表项，并用`Arc<RwLock>`包装，以便在多线程环境中安全访问。
+8. `xLIST::default`：初始化一个空的链表，其中包含一个特殊的链表末端项，用于标记链表的结束。
+9. `xLIST::traverse`：遍历链表的函数，示例中未完全实现，通常用于访问链表中的每个项。
+10. `xLIST::insert`：将一个项插入到链表中，插入位置根据项的`xItemValue`确定，以保持链表的排序。
+11. `xLIST::insert_end`：在链表的末尾插入一个项。
+12. `xLIST::remove_item`：从链表中移除一个项。
+13. `xLIST::is_empty`：检查链表是否为空。
+14. `xLIST::get_length`：获取链表的长度，即其中项的数量。
+15. `xLIST::increment_index`：移动链表的内部索引指针，用于遍历链表。
+16. `xLIST::get_owner_of_next_entry`：获取链表中下一个项的拥有者。
+17. `xLIST::get_owner_of_head_entry`：获取链表头部项的拥有者。
+18. `set_list_item_next`和`set_list_item_prev`：这两个函数用于设置链表项的`pxNext`和`pxPrevious`指针，分别指向链表中的下一个和上一个项。
 
+完整代码见仓库中的[list.rs](https://github.com/OSH-2024/mustrust/blob/main/src/FreeRTOS/src/list.rs)
+
+然后我们就可以使用这其中的函数或方法来很容易的实现原`list.c`的功能：
+
+* `list_initialise(item: &mut ItemLink)`：直接调用相应的`xList::default()`方法即可。
+
+* `list_initialiseItem(item: &mut ListItem_t)`：直接调用相应的`xList_Item::default()`方法即可。
+
+* `list_insert(list: &ListLink, item_link: &ItemLink)`：首先通过`write`方法获得待插入节点的可变引用，然后调用`set_container`方法将这个节点与其所属的链表关联起来。这个关联对于之后如果需要从链表中快速移除该节点是非常有用的，因为它允许直接定位到节点所在的链表。然后通过`write`方法获得链表的可变引用，最后调用链表的`insert`方法将节点插入到链表中。注意插入时使用的是`Arc::downgrade(&item_link)`以将`item_link`的`Arc`（一个智能指针，用于提供线程安全的引用计数所有权）转换为一个`Weak`指针，避免循环引用。
+
+* `list_insert_end(list: &ListLink, item_link: &ItemLink)`：与`list_insert`类似，不同的是最后调用的是链表的`insert_end`方法将节点插入到链表末尾。
+* `list_remove(item_link: ItemLink) -> UBaseType`：首先通过`item_link.write()`调用获取到`item_link`的可变引用。然后调用链表的`remove`方法从链表中移除`item_link`指向的节点。同样需要注意的是，这里使用的是`Arc::downgrade(&item_link)`作为参数，原因同`list_insert`。最后，`remove`方法返回链表中剩余节点的数量，类型为`UBaseType`。
+
+代码如下：
+
+```rust
+pub fn list_initialise(item: &mut ItemLink) {
+    let ItemLink = xLIST::default();
+}
+
+pub fn list_initialiseItem(item: &mut ListItem_t) {
+    let ListItem = xLIST_ITEM::default();
+}
+
+pub fn list_insert(list: &ListLink, item_link: &ItemLink) {
+    item_link.write().set_container(&list);
+    list.write().insert(Arc::downgrade(&item_link))
+}
+
+pub fn list_insert_end(list: &ListLink, item_link: &ItemLink) {
+    item_link.write().set_container(&list);
+    list.write().insert_end(Arc::downgrade(&item_link))
+}
+
+pub fn list_remove(item_link: ItemLink) -> UBaseType {
+    item_link
+        .write()
+        .remove(Arc::downgrade(&item_link))
+}
+```
 
 
 
