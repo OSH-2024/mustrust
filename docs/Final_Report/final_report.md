@@ -147,7 +147,7 @@ Rust的优点包括但不限于以下几点：
 
 由于这样的宏并不是很多，所以我们选择了**方案二**，下面就是一个修改宏的例子：
 
-![将函数功能的宏修改为函数](.\img\将函数功能的宏修改为函数.png)
+![将函数功能的宏修改为函数](./img/将函数功能的宏修改为函数.png)
 
 #### 适配上板——no-std环境
 
@@ -178,6 +178,78 @@ std::sync::RwLock => synctools::rwlock
 ### 关键模块
 
 #### list模块
+
+##### list介绍
+
+在`FreeRTOS`中，List是一个双向链表，其主要任务是辅助任务调度。
+
+在`list.h`中，每个链表`xList`由链表项`xList_Item`，链表项个数，链表的结束标记和用于进行数据完整性检查的两个条件编译字段组成，其结构体定义如下：
+
+```c
+typedef struct xLIST
+{
+	listFIRST_LIST_INTEGRITY_CHECK_VALUE
+	volatile UBaseType_t uxNumberOfItems;
+	ListItem_t * configLIST_VOLATILE pxIndex
+	MiniListItem_t xListEnd;
+	listSECOND_LIST_INTEGRITY_CHECK_VALUE
+} List_t;
+```
+
+链表项`xListItem`由节点值，指向前后结点的指针，指向拥有当前链表节点的对象的指针（通常，这个对象是一个任务控制块`TCB`），指向包含当前链表节点的链表的指针和用于进行数据完整性检查的两个条件编译字段组成，其结构体定义如下：
+
+```c
+struct xLIST_ITEM
+{
+	listFIRST_LIST_ITEM_INTEGRITY_CHECK_VALUE
+	configLIST_VOLATILE TickType_t xItemValue;
+	struct xLIST_ITEM * configLIST_VOLATILE pxNext;
+	struct xLIST_ITEM * configLIST_VOLATILE pxPrevious;
+	void * pvOwner;
+	void * configLIST_VOLATILE pvContainer;
+	listSECOND_LIST_ITEM_INTEGRITY_CHECK_VALUE
+};
+```
+
+##### Rust改写方式
+
+前面已经提到过，Rust 语言的所有权机制，给实现 List 带来了问题——链表中的链表项可能会在多个地方被使用，它们在使用完后会被释放，而这会导致链表项的生命周期提前结束。一个解决方案是使用数据结构Arc将数据包裹，它能够统计程序的不同地方对某个变量的引用，并且进行计数。只要存在这样的引用，程序就不会自动释放这个变量，从而确保了变量的有效性。
+
+但是使用Arc包裹数据又会产**循环引用**的问题，例如A引用B，B引用A，那么A，B就永远无法被释放！
+
+最终的解决方案为再引入弱引用Weak，它不会增加引用数。同时，利用Rust的upgrade和downgrade函数可以实现强引用Arc和弱引用Weak之间的转换，合理增减变量的引用数。
+
+Rust版本的链表项和链表的数据结构如下：
+
+```rust
+pub struct xLIST_ITEM
+{
+    // 辅助值，用于帮助结点做顺序排列
+	xItemValue: TickType,	
+    // 双向引用	
+	pxNext: WeakItemLink,     
+    // 双向引用
+	pxPrevious: WeakItemLink,	
+	// 指向拥有该结点的内核对象，通常是TaskControlBlock
+    pvOwner: Weak<RwLock<TaskControlBlock>>,										
+	// 指向该节点所在的链表 双向引用
+    pvContainer: Weak<RwLock<List_t>>			
+}
+
+pub struct xLIST
+{
+    // 链表节点计数器
+    uxNumberOfItems: UBaseType,
+    // 链表节点索引指针
+	pxIndex: WeakItemLink,			
+	// 链表最后一个节点 单向引用
+    xListEnd: ItemLink						
+}
+```
+
+然后，我们采取将源码的函数进行拆分为各种简单的函数或方法，然后整合的方式来实现`list`模块的功能。
+
+
 
 
 
