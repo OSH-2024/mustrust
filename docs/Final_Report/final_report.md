@@ -98,6 +98,36 @@ Rust的优点包括但不限于以下几点：
 
 ### 原始FreeRTOS分析
 
+FreeRTOS的基本架构如下图
+
+![FreeRTOS架构](img/FreeRTOS架构.jpg)
+
+我们改写的代码为**基础内核**代码
+
+源码位于本项目的`src/FreeRTOS/c_src`目录下，其主要结构如下图所示
+
+![FreeRTOS源码目录](img/FreeRTOS源码目录.png)
+
+主要文件介绍如下：
+
+**主目录下**
+- **FreeRTOS_asm_vector.S：** 汇编文件，用于定义异常向量和中断处理程序。
+- **list.c：** 包含了链表数据结构的实现，用于FreeRTOS中的任务管理和内存管理。
+- **mmu.c：** 我们自己添加的c语言版的freeRTOS的MMU实现，用于可行性验证。
+- **queue.c：** 包含了队列数据结构的实现，用于FreeRTOS中的任务间通信和同步。
+- **startup.S：** 汇编文件，用于系统启动时的初始化和配置。
+- **tasks.c：** 包含了任务管理的实现，用于创建、删除和管理任务。
+- **timers.c：** 包含了定时器管理的实现，用于任务的延时和超时操作。
+- **wrapper.c：** include 所有头文件，结合bindgen进行链接。
+
+**`portable/GCC/ARM_CA53_64_RaspberryPi3/`目录下**
+- **port.c：** 包含了与Raspberry Pi 3平台相关的端口层实现。
+- **portASM.S：** 汇编文件，用于平台相关的底层操作。
+- **portmacro.h：** 头文件，包含了与平台相关的宏定义和类型定义。
+
+**`portable/MemMang/`目录下**
+- **MemMang/heap_1.c：** 包含了一个简单的堆内存管理器的实现。
+
 
 
 ### 基本方法与原则
@@ -113,7 +143,165 @@ Rust的优点包括但不限于以下几点：
 
 #### Rust与C的相互调用
 
+##### Rust调用C代码的基本操作
 
+注意：阅读此小节，我们默认你已经初步掌握了rust编译工具链的相关知识。如果你对`build.rs`,`cargo`,`cargo.toml`,`rustc`等名词还不太熟悉，请你首先阅读相关的知识。
+
+Rust 可以通过**外部函数接口调用**（Foreign Function Interface, **FFI**）来调用 C 代码。FFI 是一种通用的机制，可以使不同语言之间的函数相互调用。在 Rust 中，使用 FFI 机制可以调用 C 语言编写的库。 我们用下面的例子来解释Rust 通过调用 C 代码的步骤：(参考博客链接：[rust调用C代码](https://vincebye.github.io/posts/rust%E8%B0%83%E7%94%A8c%E4%BB%A3%E7%A0%81/#))
+
+```C
+// C 代码
+#include <stdio.h>
+
+void c_hello(const char* name) {
+    printf("Hello, %s!\n", name);
+}
+```
+
+这是一段简单的C语言代码，定义了一个名为`c_hello`的函数，它接受一个参数`name`，类型为`char*`。
+
+1. **在 Rust 代码中声明 C 函数签名：**
+```rust
+extern "C" {
+    fn c_hello(name: *const c_char);
+}
+```
+在 Rust 代码中声明一个函数签名，其参数和返回值应该与 C 代码中的函数签名一致。这个函数签名可以使用 extern "C" 关键字进行声明，这样 Rust 就可以使用 C 语言的调用约定来调用这个函数。
+
+2. **使用 Rust 绑定链接 C 库：**
+```rust
+extern crate libc;
+use libc::c_char;
+```
+在 Rust 代码中使用`extern crate`或 `use`关键字来引用 C 库的 Rust 绑定，使得 Rust 可以访问 C 库中的函数和类型定义。
+
+具体而言，第一行`extern crate libc;`是Rust的语法，用于声明外部的crate（在Rust中，crate是一个包或库的概念）。这里的`libc`是一个crate，它提供了对C语言标准库的绑定，使得Rust代码能够使用C标准库中定义的函数和类型。通过这种方式，Rust程序可以调用C语言编写的代码，这在需要使用操作系统API或者与其他用C语言编写的库交互时非常有用。
+
+第二行`use libc::c_char;`是将`libc`库中的`c_char`类型引入当前作用域。在C语言中，`char`类型通常用于表示单个字符。Rust语言自身也有字符类型，但是当与C语言代码交互时，使用`libc`中定义的`c_char`类型可以确保类型的兼容性和正确性。`c_char`类型在不同的平台上可能有不同的定义，比如在某些平台上它是有符号的，而在其他平台上则是无符号的。使用`libc`中的`c_char`可以帮助Rust代码更好地在不同平台间移植。
+
+**在改写的实践中，不同的类型对应着不同的转换方式，对于需要的类型，需要广泛查阅资料进行尝试。**
+
+3. **在 Rust 代码中调用 C 函数：**
+```rust
+fn main() {
+    let name = "World".as_ptr() as *const c_char;
+    unsafe {
+        c_hello(name);
+    }
+}
+```
+在 Rust 代码中使用声明的 C 函数签名来调用 C 函数。在调用之前，需要使用 unsafe 关键字将代码块标记为不安全的，因为在调用 C 函数时，Rust 编译器无法保证代码的安全性。
+
+在代码中，`fn main()`定义了Rust程序的入口点。在这个函数内部，首先声明了一个名为`name`的变量，它的值是字符串`"World"`。`"World".as_ptr()`将Rust字符串转换为一个指针。这个指针随后被转换为`*const c_char`类型，这是一个指向常量C字符的指针，与C语言中的`const char*`类型兼容。这一步是必要的，因为C语言函数`void c_hello(const char* name)`预计会接收一个C字符串作为参数。
+
+4. **将 C 代码编译成 Rust 可以链接的静态库或动态库**:
+```rust
+//build.rs
+extern crate cc;
+fn main() {
+   cc::Build::new().file("src/harness.c").compile("harness.a");
+
+}
+```
+
+由于 Rust 代码和 C 代码使用的编译器和链接器可能不同，需要通过编译成中间格式的静态库或动态库来进行链接。在 Rust 中，可以使用 `cc crate` 来编译 C 代码并生成静态库或动态库。在上述代码中，`cc::Build::new().file("src/harness.c").compile("harness.a")` 的作用是使用 `cc crate` 编译 `src/harness.c` 文件，并将生成的静态库命名为 `harness.a`。需要注意的是，生成的静态库或动态库的命名和文件格式可能会因操作系统和编译器的不同而有所区别。例如，在 Windows 系统上，静态库的命名通常是 `libharness.a`，而动态库的命名通常是 `harness.dll`。生成静态库或动态库后，就可以使用 Rust 的 `#[link(name = "library_name")]` 属性来链接库文件并在 Rust 代码中调用 C 函数了。
+
+最后，要记得在`cargo.toml`文件中引入项目依赖
+```toml
+[dependencies]
+libc = "0.2"
+[build-dependencies]
+cc = "1.0"
+```
+
+如果没有在 Rust 代码中使用 `#[link(name = "library_name")]` 属性来指定链接的库的名称，Rust 编译器会**默认**按照一定的规则搜索系统默认的库文件路径来查找库文件。具体来说，Rust 编译器会按照以下顺序搜索库文件：
+1. **在系统默认的库搜索路径中查找：** 
+Rust 编译器会搜索系统默认的库文件路径，例如 `/usr/lib` 和 `/usr/local/lib` 等目录。
+2. **在 Rust 代码所在的目录中查找：** 
+如果 Rust 代码和库文件在同一个目录中，Rust 编译器会在该目录中查找库文件。
+3. **在指定的搜索路径中查找：** 
+如果在编译 Rust 代码时使用了 -L 参数指定了库文件搜索路径，Rust 编译器会在这些路径中查找库文件
+
+最后，我们得到的完整文件如下：
+```c
+// src/harness.c
+#include <stdio.h>
+
+void c_hello(const char* name) {
+    printf("Hello, %s!\n", name);
+}
+```
+```rust
+// Rust 代码
+#[link(name = "harness.a")]
+extern crate libc;
+use libc::c_char;
+// 声明 C 函数签名
+extern "C" {
+    fn c_hello(name: *const c_char);
+}
+fn main() {
+    let name = "World".as_ptr() as *const c_char;
+    unsafe {
+        c_hello(name);
+    }
+}
+```
+```rust
+//build.rs
+extern crate cc;
+fn main() {
+   cc::Build::new().file("src/harness.c").compile("harness.a");
+}
+```
+```toml
+//Cargo.toml
+[package]
+name = "c_code_with_fork_executor"
+version = "0.0.1"
+edition = "2021"
+
+[dependencies]
+libc = "0.2"
+[build-dependencies]
+cc = "1.0"
+```
+
+##### Rust调用C代码的进阶操作——bindgen的使用
+
+在Rust编程中需要与C语言库进行交互时,bindgen是一个非常有用的工具。它的主要功能是自动生成Rust的外部函数接口（FFI）代码，这使得Rust程序能够调用C语言库中的函数并使用其类型。bindgen作为一个桥梁，自动化了Rust与C语言之间的接口生成过程，极大地简化了在Rust代码中使用C语言库的复杂性。
+
+例如，对于C头文件`cool.h`:
+```c
+typedef struct CoolStruct {
+    int x;
+    int y;
+} CoolStruct;
+
+void cool_function(int i, char c, CoolStruct* cs);
+```
+
+bindgen会扫描`cool.h`，并为其中定义的每个函数和类型生成相应的Rust代码。
+```rust
+/* automatically generated by rust-bindgen 0.99.9 */
+
+#[repr(C)]
+pub struct CoolStruct {
+    pub x: ::std::os::raw::c_int,
+    pub y: ::std::os::raw::c_int,
+}
+
+extern "C" {
+    pub fn cool_function(i: ::std::os::raw::c_int,
+                         c: ::std::os::raw::c_char,
+                         cs: *mut CoolStruct);
+}
+```
+你可以轻松地在Rust项目中调用这个库的函数和使用其类型，就好像它们是原生Rust代码一样。
+
+具体使用方法参考文档:[Bindgen官方文档](https://rust-lang.github.io/rust-bindgen/introduction.html)
+
+在我们的项目中，我们最终采用 `wrapper.c` include 所有头文件，再对这一 c 文件采用bindgen的命令行工具进行 bindgen，得到干净的 `bind.rs`便于后续使用。
 
 #### 所有权机制
 
