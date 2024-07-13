@@ -194,7 +194,7 @@ fn main() {
 
 在代码中，`fn main()`定义了Rust程序的入口点。在该函数内部，首先声明一个名为`name`的变量，其值是字符串`"World"`。`"World".as_ptr()`方法将Rust字符串转换为一个指针，这个指针随后被转换为`*const c_char`类型，这是一个指向常量C字符的指针，与C语言中的`const char*`类型兼容。这一步是必要的，因为C语言函数`void c_hello(const char* name)`预计会接收一个C-style字符串作为参数。
 
-4. **将 C 代码编译成 Rust 可以链接的静态库或动态库**:
+4. **将 C 代码编译成 Rust 可以链接的静态库或动态库**：
 ```rust
 //build.rs
 extern crate cc;
@@ -204,9 +204,11 @@ fn main() {
 }
 ```
 
-由于 Rust 代码和 C 代码使用的编译器和链接器可能不同，需要通过编译成中间格式的静态库或动态库来进行链接。在 Rust 中，可以使用 `cc crate` 来编译 C 代码并生成静态库或动态库。在上述代码中，`cc::Build::new().file("src/harness.c").compile("harness.a")` 的作用是使用 `cc crate` 编译 `src/harness.c` 文件，并将生成的静态库命名为 `harness.a`。需要注意的是，生成的静态库或动态库的命名和文件格式可能会因操作系统和编译器的不同而有所区别。例如，在 Windows 系统上，静态库的命名通常是 `libharness.a`，而动态库的命名通常是 `harness.dll`。生成静态库或动态库后，就可以使用 Rust 的 `#[link(name = "library_name")]` 属性来链接库文件并在 Rust 代码中调用 C 函数了。
+由于 Rust 代码和 C 代码使用的编译器和链接器可能不同，所以需要将源代码编译成中间格式的静态库或动态库再进行链接。在 Rust 中，可以使用 `cc crate` 来编译 C 代码并生成静态库或动态库。在上述代码中，`cc::Build::new().file("src/harness.c").compile("harness.a")` 的作用是使用 `cc crate` 编译 `src/harness.c` 文件，并将生成的静态库命名为 `harness.a`。需要注意的是，生成的静态库或动态库的命名和文件格式可能会因操作系统和编译器的不同而有所区别。例如，在 Windows 系统上，静态库的命名通常是 `libharness.a`，而动态库的命名通常是 `harness.dll`。
 
-最后，要记得在`cargo.toml`文件中引入项目依赖
+生成静态库或动态库后，就可以使用 Rust 的 `#[link(name = "library_name")]` 属性来链接库文件并在 Rust 代码中调用 C 函数了。
+
+最后，要记得在`cargo.toml`文件中引入项目依赖：
 ```toml
 [dependencies]
 libc = "0.2"
@@ -214,13 +216,13 @@ libc = "0.2"
 cc = "1.0"
 ```
 
-如果没有在 Rust 代码中使用 `#[link(name = "library_name")]` 属性来指定链接的库的名称，Rust 编译器会**默认**按照一定的规则搜索系统默认的库文件路径来查找库文件。具体来说，Rust 编译器会按照以下顺序搜索库文件：
+如果没有在 Rust 代码中使用 `#[link(name = "library_name")]` 属性来指定链接的库的名称，Rust 编译器会按照一定的**默认规则**搜索系统**默认的库文件路径**来查找库文件。具体来说，Rust 编译器会按照以下顺序搜索库文件：
 1. **在系统默认的库搜索路径中查找：** 
-Rust 编译器会搜索系统默认的库文件路径，例如 `/usr/lib` 和 `/usr/local/lib` 等目录。
+Rust 编译器在系统的库文件路径中搜索库文件，例如 `/usr/lib` 和 `/usr/local/lib` 等目录。
 2. **在 Rust 代码所在的目录中查找：** 
 如果 Rust 代码和库文件在同一个目录中，Rust 编译器会在该目录中查找库文件。
 3. **在指定的搜索路径中查找：** 
-如果在编译 Rust 代码时使用了 -L 参数指定了库文件搜索路径，Rust 编译器会在这些路径中查找库文件
+如果在编译 Rust 代码时使用了 -L 参数指定了库文件搜索路径，Rust 编译器会在这些路径中查找库文件。
 
 最后，我们得到的完整文件如下：
 ```c
