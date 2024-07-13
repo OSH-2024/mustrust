@@ -145,7 +145,7 @@ FreeRTOS的基本架构如下图
 
 ##### Rust调用C代码的基本操作
 
-注意：阅读此小节，我们默认你已经初步掌握了rust编译工具链的相关知识。如果你对`build.rs`,`cargo`,`cargo.toml`,`rustc`等名词还不太熟悉，请你首先阅读相关的知识。
+注意：阅读此小节时，我们默认读者已经初步掌握了Rust编译工具链的相关知识。如果你对`build.rs`,`cargo`,`cargo.toml`,`rustc`等名词还不太熟悉，请读者先自行了解相关知识。
 
 Rust 可以通过**外部函数接口调用**（Foreign Function Interface, **FFI**）来调用 C 代码。FFI 是一种通用的机制，可以使不同语言之间的函数相互调用。在 Rust 中，使用 FFI 机制可以调用 C 语言编写的库。 我们用下面的例子来解释Rust 通过调用 C 代码的步骤：(参考博客链接：[rust调用C代码](https://vincebye.github.io/posts/rust%E8%B0%83%E7%94%A8c%E4%BB%A3%E7%A0%81/#))
 
