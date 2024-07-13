@@ -494,6 +494,115 @@ pub fn list_remove(item_link: ItemLink) -> UBaseType {
 
 #### task模块
 
+##### 概述
+任务模块是操作系统的重要组成部分，负责管理任务的创建、删除和调度。它提供必要的数据结构和功能来处理任务控制块（TCB）、任务优先级、任务状态等相关功能。
+
+##### 任务控制块（TaskControlBlock）
+`TaskControlBlock` 结构体保存了每个任务的信息，例如其优先级、名称、堆栈指针和各种任务状态。它包括通过条件编译启用的多个配置选项。
+
+```rust
+pub struct TaskControlBlock {
+    state_list_item: ItemLink,
+    event_list_item: ItemLink,
+    priority: UBaseType,
+    task_name: String,
+    stack_pointer: StackType,
+    stack_length: UBaseType,
+
+    #[cfg(feature = "portCRITICAL_NESTING_IN_TCB")]
+    critical_nesting: UBaseType,
+    #[cfg(feature = "configUSE_MUTEXES")]
+    base_priority: UBaseType,
+    #[cfg(feature = "configUSE_MUTEXES")]
+    mutexed_held: UBaseType,
+    #[cfg(feature = "configGENERATE_RUN_TIME_STATS")]
+    run_time_counter: TickType,
+    #[cfg(feature = "configUSE_TASK_NOTIFICATIONS")]
+    notified_value: u32,
+    #[cfg(feature = "configUSE_TASK_NOTIFICATIONS")]
+    nofity_state: u8,
+    #[cfg(feature = "INCLUDE_xTaskAbortDelay")]
+    delay_aborted: bool,
+}
+```
+对C语言预处理指令中的条件编译，我们在rust改写中主要使用如上图代码所示的包括 `#[cfg]`、`#[cfg_attr]` 等属性宏来处理。
+
+##### 初始化
+`initialize` 方法为任务设置堆栈并为其执行做准备。它为堆栈分配内存，设置堆栈指针，并使用提供的函数初始化堆栈。
+
+```rust
+impl TaskControlBlock {
+    pub fn initialize<F>(mut self, func: F) -> Result<TaskHandle, FreeRtosError>
+    where
+        F: FnOnce() -> () + Send + 'static,
+    {
+        // 堆栈分配和初始化逻辑
+    }
+}
+```
+
+##### 任务句柄（TaskHandle）
+`TaskHandle` 结构体是 `Arc<RwLock<TaskControlBlock>>` 的封装，提供对 TCB 的线程安全访问。它包括操作任务优先级、状态和其他属性的方法。
+
+```rust
+#[derive(Clone)]
+pub struct TaskHandle(Arc<RwLock<TaskControlBlock>>);
+
+impl TaskHandle {
+    pub fn get_name(&self) -> String {
+        GetTaskControlBlockRead!(self).get_name().to_string()
+    }
+
+    pub fn set_priority(&self, priority: UBaseType) {
+        GetTaskControlBlockWrite!(self).set_priority(priority);
+    }
+
+    // 其他与任务相关的方法
+}
+```
+
+##### 任务创建和调度
+该模块包含将任务添加到就绪列表、管理延迟任务和处理任务删除的函数。这些函数确保任务被正确调度并在不同状态之间转换。
+
+```rust
+pub fn add_current_task_to_delayed_list(ticks_to_delay: TickType, can_block_indefinitely: bool) {
+    let current_task_handle = get_current_task_handle!();
+    // 管理延迟任务的逻辑
+}
+
+#[cfg(feature = "INCLUDE_vTaskDelete")]
+pub fn task_delete(task_to_delete: TaskHandle) {
+    let tcb = GetTaskControlBlockWrite!(task_to_delete);
+    // 任务删除逻辑
+}
+```
+
+##### 任务挂起和恢复
+该模块还提供挂起和恢复任务的机制，确保任务可以根据需要暂停和恢复。
+
+```rust
+#[cfg(feature = "INCLUDE_vTaskSuspend")]
+pub fn is_task_suspended(task: &TaskHandle) -> bool {
+    let mut result = false;
+    let tcb = GetTaskControlBlockRead!(task);
+    // 检查任务是否挂起的逻辑
+}
+```
+
+##### 任务宏
+定义了多个宏来处理任务通知、堆栈填充和其他与任务相关的操作。这些宏提供了执行常见任务操作的方便方法。
+
+```rust
+#[macro_export]
+macro_rules! taskNOT_WAITING_NOTIFICATION { () => { 0 as u8 } }
+#[macro_export]
+macro_rules! taskWAITING_NOTIFICATION { () => { 1 as u8 } }
+#[macro_export]
+macro_rules! taskNOTIFICATION_RECEIVED { () => { 2 as u8 } }
+```
+
+##### 总结
+任务模块是一个综合组件，管理操作系统中任务的生命周期和调度。它提供必要的结构和功能来创建、删除、挂起、恢复和调度任务，确保高效和可靠的任务管理。
 
 
 ## MMU部分
@@ -585,15 +694,76 @@ qemu-system-aarch64 -M raspi3b -m 1024M -serial null -serial mon:stdio -nographi
 
 ### 整体测试结果
 
+为了验证操作系统的有效性，我们编写并执行了以下的测试任务：
+
+#### 测试方案
+
+1. **MMU的测试程序 (TaskA)**：
+   - 通过模拟内存管理单元 (MMU) 的行为，测试了系统对内存地址转换和虚拟内存的支持情况。
+   - 测试了TLB（Translation Lookaside Buffer）的命中率和内存访问命中率。
+
+2. **计时器程序 (TaskB)**：
+   - 通过定时器的输出，验证了操作系统在时间管理和任务调度方面的稳定性和准确性。
+
+3. **循环输出歌词的程序 (TaskC)**：
+   - 反复输出歌曲 ***"Never Gonna Give You Up"*** 的副歌部分，测试了系统在处理重复任务和字符串操作上的表现。
+
+4. **计算π的前10,000位的程序 (TaskD)**：
+   - 进行了高精度的数学计算，测试了操作系统在执行复杂计算任务时的效率和准确性。
+
+此外，我们采用了上节中提到的交叉编译和上板的相关技术，将这些测试任务运行在QEMU虚拟机上，以模拟实际硬件环境。
+
+#### 测试结果
+
+所有的任务均井然有序地运行，操作系统的各项功能一切正常。具体测试结果如下：
+
+1. **MMU的测试程序 (TaskA)**：
+   - TLB命中率为99.980848%（534629516 / 534731924）
+   - 内存访问命中率为99.980850%（534629524 / 534731924）
+   - 估算执行时间为258822165124纳秒
+
+2. **快速排序测试**：
+   - 初始化数组并完成快速排序
+   - TLB命中率为99.995573%（1106853 / 1106902）
+   - 内存访问命中率为99.995573%（1106853 / 1106902）
+   - 估算执行时间为214802002纳秒
+
+3. **计时器程序 (TaskB)**：
+   - 定时输出当前时间，验证了时间管理的稳定性。
+
+4. **循环输出歌词程序 (TaskC)**：
+   - 持续输出歌词，验证了系统在处理字符串和重复任务方面的稳定性。
+
+5. **高精度计算程序 (TaskD)**：
+   - 成功计算出π的前10,000位，验证了系统在执行复杂计算任务时的效率和准确性。
+
+通过这些测试，我们确认了操作系统在内存管理、任务调度、字符串处理和复杂计算任务等方面的稳定性和有效性。具体输出如图所示：
+
+![测试输出](img/result.png)
 
 
 ## 总结
 
 ### 项目成果回顾
 
+在本次mustrust小组项目中，我们成功地将FreeRTOS的核心功能重写为Rust语言，并实现了多项关键成果：
 
+1. **代码重写与交叉编译**：我们完成了FreeRTOS的代码重写，并成功实现了Rust与C之间的交叉编译。这为后续的集成与测试奠定了基础。
+
+2. **跨体系结构的交叉编译**：通过构建跨体系结构的工具链，我们在不同平台上成功编译并运行了Rust版本的FreeRTOS。使用QEMU模拟器，我们验证了代码在虚拟环境中的正确性。
+
+3. **MMU虚拟环境搭建与测试**：在目标环境中成功搭建了MMU虚拟环境，并进行了一系列测试，验证了系统的内存管理能力与稳定性。这一成就使得我们能够深入探索内存保护和虚拟内存管理的可能性。
 
 ### 未来工作展望
 
+展望未来，我们将聚焦以下几个重要方向，以进一步推动项目的发展：
 
+1. **硬件MMU支持**：我们计划对FreeRTOS的底层原理进行深入研究，以支持硬件MMU功能。目前，FreeRTOS基于“物理地址 == 逻辑地址”的内存模型，可能需要进行必要的调整，以实现更高效的内存管理和保护机制。
 
+2. **硬件上板的探究**：目前，尚无将Rust重写的FreeRTOS在真实硬件上运行的先例。我们希望能够探索这一领域，推动Rust在嵌入式系统中的实际应用，尤其是在硬件资源有限的环境下。
+
+3. **相关专业知识的整合**：将继续结合计算机科学的相关专业知识，深化对操作系统、内存管理和嵌入式系统架构的理解，提升项目的学术深度和应用广度。
+
+4. **测试与优化**：计划进行系统的全面测试，包括单元测试和集成测试，以确保软件在不同环境下的稳定性。同时，针对性能瓶颈进行优化，提升整体响应速度和资源利用效率。
+
+通过这些努力，我们期望推动Rust与FreeRTOS结合的创新应用，进一步提升嵌入式系统开发的安全性和效率。
