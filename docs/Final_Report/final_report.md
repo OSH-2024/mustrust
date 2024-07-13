@@ -558,6 +558,22 @@ qemu-system-aarch64 -M raspi3b -m 1024M -serial null -serial mon:stdio -nographi
 
 在测试的过程中，经常会出现程序遇到 panic，此时 QEMU 会宕机，并不产生任何输出，且由于运行于内核环境，难以通过输出中间值的方式对程序进行调试，所以这里就需要用到 `gdb-multiarch` 工具进行调试。
 
+该工具的使用方法如下：
+
++ 首先使用调试模式运行 QEMU，命令如下：
+
+  ```sh
+  qemu-system-aarch64 -M raspi3b -m 1024M -serial null -serial mon:stdio -nographic -kernel build/FreeRTOS.elf –s –S
+  ```
+
+  该命令相比于之前的命令，多出了一个 `-s` 和一个 `-S`，其中 `-s` 代表为 gdb 打开 1234 端口，相当于 `-gdb tcp::1234`，`-S` 代表在开始运行后冻结 CPU，并等待 gdb 发出的指令。
+
++ 开始运行后，端口 1234 会被打开供 gdb 访问，此时运行 `gdb-multiarch build/FreeRTOS.elf`，令 gdb 打开这个待调试的内核文件，进入 gdb 后，输入 `target remote:1234` 即可启动调试。效果如下：
+
+  <img src="img/image-20240713151611451.png" alt="image-20240713151611451" style="zoom:50%;" />
+
+
+
 ### 整体测试结果
 
 
