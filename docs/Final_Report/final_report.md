@@ -87,7 +87,7 @@ Rust的优点包括但不限于以下几点：
 
 #### 实现的功能
 
-* Rust版本的FreeRTOS系统顺利在QEMU上运行
+* 成功在QEMU上运行Rust版本的FreeRTOS系统，验证其核心功能
 * MMU功能顺利实现
 
 #### 同类项目对比
