@@ -510,15 +510,53 @@ pub fn list_remove(item_link: ItemLink) -> UBaseType {
 
 ### bindgen方案
 
+Rust 的 bindgen 工具只能支持单个问题，如果需要对含有多个文件的项目进行 bindgen 并交叉调用，则需要单独写一个 `wrapper.c` 文件，其包含所有需要用到的头文件：
 
+``` c
+#include <stddef.h>
+#include "FreeRTOS.h"
+#include "list.h"
+#include "mmu.h"
+#include "queue.h"
+#include "semphr.h"
+#include "task.h"
+#include "timers.h"
+#include "portmacro.h"
+```
+
+对 `wrapper.c` 进行 bindgen，即可得到干净的 `bindings.rs`，即对原代码中调用的库（如 `stdio.h` 等），`bindings.rs` 中不会生成其中的函数。
 
 ### 链接
 
+由于需要兼容上板，我们需要使用专门的编译器 `aarch64-none-elf-gcc` 进行链接以获得可以上板运行的操作系统内核文件。在安装完这个编译器后，为了让 Rust 能够使用该编译器进行链接，需要在 Cargo 的配置文件 `~/.cargo/config` 中加入以下两行代码：
 
+``` ini
+[target.aarch64-unknown-none]
+linker = "aarch64-none-elf-gcc"
+```
+
+同时我们也需要在 `build.rs` 中加入以下几行，以使用 `raspberrypi3.ld` 中定义的参数进行链接，并最终输出到 `build/FreeRTOS.elf`：
+
+```rust
+println!("cargo:rustc-link-arg-bins=-T");
+println!("cargo:rustc-link-arg-bins=raspberrypi3.ld");
+println!("cargo:rustc-link-arg-bins=-o");
+println!("cargo:rustc-link-arg-bins=build/FreeRTOS.elf");
+```
+
+整个过程配置完成后，进行编译，编译成功后即可生成操作系统内核文件 `FreeRTOS.elf`。
 
 ### QEMU模拟与调试
 
+要运行生成出来的内核文件，需要使用以下参数启动 QEMU：
 
+```sh
+qemu-system-aarch64 -M raspi3b -m 1024M -serial null -serial mon:stdio -nographic -kernel build/FreeRTOS.elf
+```
+
+其中 `-M raspi3b` 表示在 RaspberryPi 3B 即树莓派 3B 的环境下运行，`-m 1024M` 表示设置内存大小为 1024M。运行该命令，如果一切正常，即可在命令行中看到每个任务的输出。
+
+在测试的过程中，经常会出现程序遇到 panic，此时 QEMU 会宕机，并不产生任何输出，且由于运行于内核环境，难以通过输出中间值的方式对程序进行调试，所以这里就需要用到 `gdb-multiarch` 工具进行调试。
 
 ### 整体测试结果
 
