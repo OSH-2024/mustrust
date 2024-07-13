@@ -367,13 +367,13 @@ std::sync::RwLock => synctools::rwlock
 
 ### 关键模块
 
-#### list模块
+#### List模块
 
-##### list介绍
+##### List介绍
 
-在`FreeRTOS`中，List是一个双向链表，其主要任务是辅助任务调度。
+在FreeRTOS中，`List`是一个双向链表，其主要任务是辅助任务调度。
 
-在`list.h`中，每个链表`xList`由链表项`xList_Item`，链表项个数，链表的结束标记和用于进行数据完整性检查的两个条件编译字段组成，其结构体定义如下：
+在`list.h`中，每个链表`xList`由链表项`xList_Item`、链表项个数、链表的结束标记和用于进行数据完整性检查的两个条件编译字段组成，其结构体定义如下：
 
 ```c
 typedef struct xLIST
@@ -386,7 +386,7 @@ typedef struct xLIST
 } List_t;
 ```
 
-链表项`xListItem`由节点值，指向前后结点的指针，指向拥有当前链表节点的对象的指针（通常，这个对象是一个任务控制块`TCB`），指向包含当前链表节点的链表的指针和用于进行数据完整性检查的两个条件编译字段组成，其结构体定义如下：
+链表项`xListItem`由结点值、指向前后结点的指针、指向拥有当前链表结点的对象的指针（通常，这个对象是一个任务控制块`TCB`）、指向包含当前链表结点的链表的指针和用于进行数据完整性检查的两个条件编译字段组成，其结构体定义如下：
 
 ```c
 struct xLIST_ITEM
@@ -403,7 +403,7 @@ struct xLIST_ITEM
 
 ##### Rust改写方式
 
-前面已经提到过，Rust 语言的所有权机制，给实现 List 带来了问题——链表中的链表项可能会在多个地方被使用，它们在使用完后会被释放，而这会导致链表项的生命周期提前结束。一个解决方案是使用数据结构Arc将数据包裹，它能够统计程序的不同地方对某个变量的引用，并且进行计数。只要存在这样的引用，程序就不会自动释放这个变量，从而确保了变量的有效性。
+前面已经提到过，Rust 语言的所有权机制，给实现 `List` 带来了问题——链表中的链表项可能会在多个地方被使用，它们在使用完后会被释放，而这会导致链表项的生命周期提前结束。一个解决方案是使用数据结构`Arc`将数据包裹，它能够统计程序的不同地方对某个变量的引用，并且进行计数。只要存在这样的引用，程序就不会自动释放这个变量，从而确保了变量的有效性。
 
 但是使用Arc包裹数据又会产**循环引用**的问题，例如A引用B，B引用A，那么A，B就永远无法被释放！
 
@@ -419,14 +419,14 @@ pub struct xLIST_ITEM
 	pxNext: WeakItemLink,	// 双向引用
 	pxPrevious: WeakItemLink,	// 双向引用
     pvOwner: Weak<RwLock<TaskControlBlock>>,	// 指向拥有该结点的内核对象
-    pvContainer: Weak<RwLock<List_t>>,	// 指向该节点所在的链表 双向引用
+    pvContainer: Weak<RwLock<List_t>>,	// 指向该结点所在的链表，双向引用
 }
 
 pub struct xLIST
 {
-    uxNumberOfItems: UBaseType,	// 链表节点计数器
-	pxIndex: WeakItemLink,	// 链表节点索引指针			
-    xListEnd: ItemLink,	// 链表最后一个节点 单向引用					
+    uxNumberOfItems: UBaseType,	// 链表结点计数器
+	pxIndex: WeakItemLink,	// 链表结点索引指针			
+    xListEnd: ItemLink,	// 链表最后一个结点，单向引用					
 }
 ```
 
@@ -459,10 +459,10 @@ pub struct xLIST
 
 * `list_initialiseItem(item: &mut ListItem_t)`：直接调用相应的`xList_Item::default()`方法即可。
 
-* `list_insert(list: &ListLink, item_link: &ItemLink)`：首先通过`write`方法获得待插入节点的可变引用，然后调用`set_container`方法将这个节点与其所属的链表关联起来。这个关联对于之后如果需要从链表中快速移除该节点是非常有用的，因为它允许直接定位到节点所在的链表。然后通过`write`方法获得链表的可变引用，最后调用链表的`insert`方法将节点插入到链表中。注意插入时使用的是`Arc::downgrade(&item_link)`以将`item_link`的`Arc`（一个智能指针，用于提供线程安全的引用计数所有权）转换为一个`Weak`指针，避免循环引用。
+* `list_insert(list: &ListLink, item_link: &ItemLink)`：首先通过`write`方法获得待插入结点的可变引用，然后调用`set_container`方法将这个结点与其所属的链表关联起来。这个关联对于之后从链表中快速移除该结点是非常有用的，因为它允许了直接定位到结点所在的链表。然后通过`write`方法获得链表的可变引用，最后调用链表的`insert`方法将结点插入到链表中。注意插入时使用的是`Arc::downgrade(&item_link)`以将`item_link`的`Arc`（一个智能指针，用于提供线程安全的引用计数所有权）转换为一个`Weak`指针，避免循环引用。
 
-* `list_insert_end(list: &ListLink, item_link: &ItemLink)`：与`list_insert`类似，不同的是最后调用的是链表的`insert_end`方法将节点插入到链表末尾。
-* `list_remove(item_link: ItemLink) -> UBaseType`：首先通过`item_link.write()`调用获取到`item_link`的可变引用。然后调用链表的`remove`方法从链表中移除`item_link`指向的节点。同样需要注意的是，这里使用的是`Arc::downgrade(&item_link)`作为参数，原因同`list_insert`。最后，`remove`方法返回链表中剩余节点的数量，类型为`UBaseType`。
+* `list_insert_end(list: &ListLink, item_link: &ItemLink)`：与`list_insert`类似，不同的是最后调用的是链表的`insert_end`方法将结点插入到链表末尾。
+* `list_remove(item_link: ItemLink) -> UBaseType`：首先通过`item_link.write()`调用获取到`item_link`的可变引用。然后调用链表的`remove`方法从链表中移除`item_link`指向的结点。同样需要注意的是，这里使用的是`Arc::downgrade(&item_link)`作为参数，原因同`list_insert`。最后，`remove`方法返回链表中剩余结点的数量，类型为`UBaseType`。
 
 代码如下：
 
@@ -527,10 +527,10 @@ pub struct TaskControlBlock {
     delay_aborted: bool,
 }
 ```
-对C语言预处理指令中的条件编译，我们在rust改写中主要使用如上图代码所示的包括 `#[cfg]`、`#[cfg_attr]` 等属性宏来处理。
+对于C语言预处理指令中的条件编译，我们在Rust改写中主要使用如上图代码所示的 `#[cfg]`、`#[cfg_attr]` 等属性宏来处理。
 
 ##### 初始化
-`initialize` 方法为任务设置堆栈并为其执行做准备。它为堆栈分配内存，设置堆栈指针，并使用提供的函数初始化堆栈。
+`initialize` 方法为任务设置堆栈并为其执行做准备。它为堆栈分配内存，设置堆栈指针，并使用提供的函数初始化堆栈：
 
 ```rust
 impl TaskControlBlock {
@@ -592,7 +592,7 @@ pub fn is_task_suspended(task: &TaskHandle) -> bool {
 ```
 
 ##### 任务宏
-定义了多个宏来处理任务通知、堆栈填充和其他与任务相关的操作。这些宏提供了执行常见任务操作的方便方法。
+task模块定义了多个宏来处理任务通知、堆栈填充和其他与任务相关的操作。这些宏提供了执行常见任务操作的方便方法。
 
 ```rust
 #[macro_export]
@@ -604,7 +604,7 @@ macro_rules! taskNOTIFICATION_RECEIVED { () => { 2 as u8 } }
 ```
 
 ##### 总结
-任务模块是一个综合组件，管理操作系统中任务的生命周期和调度。它提供必要的结构和功能来创建、删除、挂起、恢复和调度任务，确保高效和可靠的任务管理。
+任务模块是一个综合组件，管理操作系统中任务的生命周期和调度，它提供必要的结构和功能来创建、删除、挂起、恢复和调度任务，确保了FreeRTOS高效和可靠的任务管理。
 
 
 ## MMU部分
@@ -842,7 +842,7 @@ void FIFO_list_init(LINKNODE *list) {
     *list = (*list)->next;
 }
 ```
-`LRU_list_init`函数初始化LRU策略的链表，每个节点代表一个内存帧，并将其插入到链表中。`FIFO_list_init`函数初始化FIFO策略的链表，通过链表头和尾的移动实现FIFO。
+`LRU_list_init`函数初始化LRU策略的链表，每个结点代表一个内存帧，并将其插入到链表中。`FIFO_list_init`函数初始化FIFO策略的链表，通过链表头和尾的移动实现FIFO。
 
 #### 其他辅助函数
 除了上述关键函数外，还有一些辅助函数用于统计、内存访问、缓存访问时间等。
