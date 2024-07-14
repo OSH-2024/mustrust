@@ -1,10 +1,9 @@
-# mustrust小组期末汇报
-- [mustrust小组期末汇报](#mustrust小组期末汇报)
+# mustrust小组结题报告
+- [mustrust小组结题报告](#mustrust小组结题报告)
   - [引言](#引言)
     - [项目背景](#项目背景)
       - [FreeRTOS](#freertos)
       - [Rust](#rust)
-    - [小组分工](#小组分工)
     - [项目成果概述](#项目成果概述)
       - [实现的功能](#实现的功能)
       - [同类项目对比](#同类项目对比)
@@ -13,22 +12,44 @@
     - [基本方法与原则](#基本方法与原则)
     - [遇到的困难与解决方案](#遇到的困难与解决方案)
       - [Rust与C的相互调用](#rust与c的相互调用)
+        - [Rust调用C代码的基本操作](#rust调用c代码的基本操作)
+        - [Rust调用C代码的进阶操作——bindgen的使用](#rust调用c代码的进阶操作bindgen的使用)
       - [所有权机制](#所有权机制)
       - [const常量重复定义](#const常量重复定义)
       - [具有函数功能的宏被bindgen忽略](#具有函数功能的宏被bindgen忽略)
       - [适配上板——no-std环境](#适配上板no-std环境)
     - [关键模块](#关键模块)
       - [list模块](#list模块)
+        - [list介绍](#list介绍)
+        - [Rust改写方式](#rust改写方式)
       - [task模块](#task模块)
+        - [概述](#概述)
+        - [任务控制块（TaskControlBlock）](#任务控制块taskcontrolblock)
+        - [初始化](#初始化)
+        - [任务句柄（TaskHandle）](#任务句柄taskhandle)
+        - [任务创建和调度](#任务创建和调度)
+        - [任务挂起和恢复](#任务挂起和恢复)
+        - [任务宏](#任务宏)
+        - [总结](#总结)
   - [MMU部分](#mmu部分)
+    - [概述](#概述-1)
     - [关键函数](#关键函数)
+      - [初始化函数](#初始化函数)
+      - [内存读写函数](#内存读写函数)
+      - [地址映射函数](#地址映射函数)
+      - [缺页处理函数](#缺页处理函数)
+      - [TLB操作函数](#tlb操作函数)
+      - [页面替换策略初始化函数](#页面替换策略初始化函数)
+      - [其他辅助函数](#其他辅助函数)
     - [模拟结果](#模拟结果)
   - [交叉编译与上板](#交叉编译与上板)
     - [bindgen方案](#bindgen方案)
     - [链接](#链接)
     - [QEMU模拟与调试](#qemu模拟与调试)
     - [整体测试结果](#整体测试结果)
-  - [总结](#总结)
+      - [测试方案](#测试方案)
+      - [测试结果](#测试结果)
+  - [总结](#总结-1)
     - [项目成果回顾](#项目成果回顾)
     - [未来工作展望](#未来工作展望)
 
@@ -367,11 +388,11 @@ std::sync::RwLock => synctools::rwlock
 
 ### 关键模块
 
-#### List模块
+#### list模块
 
-##### List介绍
+##### list介绍
 
-在FreeRTOS中，`List`是一个双向链表，其主要任务是辅助任务调度。
+在FreeRTOS中，`xList`是一个双向链表，其主要任务是辅助任务调度。
 
 在`list.h`中，每个链表`xList`由链表项`xList_Item`、链表项个数、链表的结束标记和用于进行数据完整性检查的两个条件编译字段组成，其结构体定义如下：
 
@@ -415,18 +436,17 @@ Rust版本的链表项和链表的数据结构如下：
 pub struct xLIST_ITEM
 {
 	xItemValue: TickType,	// 辅助值，用于帮助结点做顺序排列
-	
 	pxNext: WeakItemLink,	// 双向引用
 	pxPrevious: WeakItemLink,	// 双向引用
-    pvOwner: Weak<RwLock<TaskControlBlock>>,	// 指向拥有该结点的内核对象
-    pvContainer: Weak<RwLock<List_t>>,	// 指向该结点所在的链表，双向引用
+	pvOwner: Weak<RwLock<TaskControlBlock>>,	// 指向拥有该结点的内核对象
+	pvContainer: Weak<RwLock<List_t>>,	// 指向该结点所在的链表，双向引用
 }
 
 pub struct xLIST
 {
-    uxNumberOfItems: UBaseType,	// 链表结点计数器
-	pxIndex: WeakItemLink,	// 链表结点索引指针			
-    xListEnd: ItemLink,	// 链表最后一个结点，单向引用					
+	uxNumberOfItems: UBaseType,	// 链表结点计数器
+    pxIndex: WeakItemLink,	// 链表结点索引指针			
+	xListEnd: ItemLink,	// 链表最后一个结点，单向引用					
 }
 ```
 
